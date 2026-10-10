@@ -1,0 +1,24 @@
+:host { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.banner {
+  flex: none; z-index: 1000;
+  padding: 12px 16px; font-size: 18px; font-weight: 700;
+  background: var(--red); color: #fff;
+  animation: pulse 1s infinite alternate;
+}
+header {
+  flex: none;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  padding: 10px 16px; border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; font-size: 18px; color: var(--fg); text-decoration: none; }
+nav { display: flex; gap: 4px; }
+nav a { padding: 6px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+nav a.active, nav a:hover { color: var(--fg); background: #21262d; }
+.arm { border-color: var(--yellow); }
+.armed { color: var(--green); font-size: 13px; }
+.clock { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Pages get exactly the remaining height; long pages (Setup) scroll inside main. */
+main { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px; }
+:host(.kiosk) main { padding: 8px; }
+.kiosk-arm { position: fixed; right: 12px; bottom: 12px; z-index: 1500; opacity: .85; }
+.notice { flex: none; padding: 6px 16px; background: #1f3a5f; border-bottom: 1px solid var(--blue); }

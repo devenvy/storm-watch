@@ -1,0 +1,28 @@
+@if (alerts.danger().length) {
+  <div class="banner" role="alert">
+    ⚠ {{ alerts.dangerEvents().join(' · ') }} for {{ settings.location()?.label }}. If a Tornado Warning is in effect, take shelter now.
+  </div>
+}
+@if (!kiosk()) {
+  <header>
+    <a class="brand" routerLink="/">Storm Watch</a>
+    <nav>
+      <a routerLink="/" [class.active]="onBoard()">Dashboard</a>
+      <a routerLink="/watch" routerLinkActive="active">Watch</a>
+      <a routerLink="/setup" routerLinkActive="active">Setup</a>
+    </nav>
+    @if (!settings.soundArmed()) {
+      <button class="arm" (click)="alerts.arm()">🔔 Enable alert sounds</button>
+    } @else {
+      <span class="armed">🔔 Alerts armed</span>
+    }
+    <span class="clock">{{ clock().toLocaleTimeString() }}</span>
+  </header>
+} @else if (!settings.soundArmed()) {
+  <!-- Browsers only allow sound after a tap/click, even in kiosk mode. -->
+  <button class="arm kiosk-arm" (click)="alerts.arm()">🔔 Tap to enable alert sounds</button>
+}
+@if (notice()) { <div class="notice" role="status">{{ notice() }}</div> }
+<main>
+  <router-outlet />
+</main>

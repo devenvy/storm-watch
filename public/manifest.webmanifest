@@ -1,0 +1,11 @@
+{
+  "name": "Storm Watch",
+  "short_name": "Storm Watch",
+  "description": "Severe weather monitor: alerts, radar, conditions, tropical storms and live TV.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

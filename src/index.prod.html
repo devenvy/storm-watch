@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <!-- Same policy nginx sends as a header (minus frame-ancestors, which only works as a header). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src * data: blob:; media-src * data: blob:; connect-src *; worker-src 'self' blob:; font-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <title>Storm Watch</title>
+  <base href="./">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Severe weather monitor: NWS alerts, radar with forecast, conditions, tropical storms and your own live TV.">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+  <sw-root></sw-root>
+</body>
+</html>
