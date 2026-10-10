@@ -1,4 +1,4 @@
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { dangerLabel, isDanger, NwsAlert, NwsService, Observation, WarningShape } from './nws.service';
 import { SettingsStore } from './settings.store';
@@ -97,7 +97,8 @@ export class AlertsStore {
       this.stations.set([]);
       this.feeds.set(EMPTY);
       if (!loc || !ready) return;
-      this.refresh();
+      // Untracked: refresh reads other signals (e.g. stations), which must not re-run this effect.
+      untracked(() => void this.refresh());
       this.timer = setInterval(() => this.refresh(), POLL_MS);
     });
   }
