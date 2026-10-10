@@ -24,6 +24,7 @@ import { compass } from '../../shared/format';
       @if (alerts.station(); as s) {
         <p class="src muted">Home station{{ s.place ? ' in ' + s.place : '' }}, {{ s.distanceMi | number: '1.0-1' }} mi away
           @if (settings.pws() === s.id) { · pinned }</p>
+        @if (alerts.feeds().pws.error) { <p class="warn small">Home station network unreachable, showing the last readings.</p> }
         <div class="stats">
           <div><b>{{ s.tempF ?? '–' }}°</b><small>feels {{ s.feelsLikeF ?? '–' }}°</small></div>
           <div><b>{{ s.windMph ?? '–' }}</b><small>wind {{ compass(s.windDir) }}</small></div>
@@ -89,6 +90,7 @@ import { compass } from '../../shared/format';
     .nws { font-size: 12px; margin: 8px 0 0; }
     .small { font-size: 12px; margin: 6px 0 0; }
     .err { color: var(--red); margin: 0; }
+    .warn { color: var(--yellow); margin: 0 0 4px; }
     .nearby { margin-top: 8px; font-size: 12px; }
     .nearby summary { cursor: pointer; }
     .nearby ul { list-style: none; margin: 4px 0; padding: 0; }
