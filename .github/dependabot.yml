@@ -1,9 +1,11 @@
 version: 2
 
-# One weekly pull request for everything (npm, GitHub Actions, Docker base images).
+# One weekly pull request for everything (npm, GitHub Actions, Docker base images), plus one per
+# ecosystem for security fixes.
 # Major versions are left out so that PR stays green: they usually need code changes or are blocked by
 # Angular's supported ranges (e.g. Angular 22 requires TypeScript 6.0.x), and odd Node.js majors never
-# become LTS. Do major upgrades by hand (`ng update` for Angular).
+# become LTS. Do major upgrades by hand (`ng update` for Angular; a new @devenvy/code-guidelines major
+# is a deliberate baseline change).
 multi-ecosystem-groups:
   dependencies:
     schedule:
@@ -16,14 +18,25 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
     ignore:
       - dependency-name: '*'
         update-types: [version-update:semver-major]
+      # Angular 22's compiler supports TypeScript 6.0.x only
+      - dependency-name: typescript
+        update-types: [version-update:semver-minor]
 
   - package-ecosystem: github-actions
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
     ignore:
       - dependency-name: '*'
         update-types: [version-update:semver-major]
@@ -32,6 +45,10 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
     ignore:
       - dependency-name: '*'
         update-types: [version-update:semver-major]
