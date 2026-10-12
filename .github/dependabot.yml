@@ -18,6 +18,11 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    # conventional titles for release-please: dependency updates ship as a patch release
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
     groups:
       security:
         applies-to: security-updates
@@ -33,6 +38,11 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    # conventional titles for release-please: dependency updates ship as a patch release
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
     groups:
       security:
         applies-to: security-updates
@@ -45,6 +55,11 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
+    # conventional titles for release-please: dependency updates ship as a patch release
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
     groups:
       security:
         applies-to: security-updates

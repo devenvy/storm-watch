@@ -13,17 +13,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Shared CI and the container smoke test must both pass before publishing.
+  # CI (including the container smoke test) must pass before publishing.
   ci:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
       pull-requests: write
-  docker:
-    uses: ./.github/workflows/docker.yml
 
   build:
-    needs: [ci, docker]
+    needs: ci
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
