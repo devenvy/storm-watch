@@ -39,7 +39,9 @@ export class IndexedDbBackend implements StorageBackend {
   /** Run one write and resolve only once its transaction has committed. */
   private async write(op: (store: IDBObjectStore) => IDBRequest): Promise<boolean> {
     const store = await this.tx('readwrite');
-    if (!store) {return false;}
+    if (!store) {
+      return false;
+    }
     const t = store.transaction;
     await new Promise<void>((resolve, reject) => {
       t.oncomplete = () => resolve();
@@ -51,25 +53,35 @@ export class IndexedDbBackend implements StorageBackend {
 
   async get<T>(key: string): Promise<T | undefined> {
     const store = await this.tx('readonly');
-    if (!store) {return this.legacy.get<T>(key);}
+    if (!store) {
+      return this.legacy.get<T>(key);
+    }
     const value = await req(store.get(key)).catch(() => undefined);
-    if (value !== undefined) {return value as T;}
+    if (value !== undefined) {
+      return value as T;
+    }
     const old = await this.legacy.get<T>(key);
     if (old !== undefined) {
       // Drop the legacy copy only after the new one is durably committed.
       try {
         await this.set(key, old);
         await this.legacy.remove(key);
-      } catch { /* keep the localStorage copy; migration retries next load */ }
+      } catch {
+        /* keep the localStorage copy; migration retries next load */
+      }
     }
     return old;
   }
 
   async set<T>(key: string, value: T): Promise<void> {
-    if (!(await this.write(s => s.put(value, key)))) {return this.legacy.set(key, value);}
+    if (!(await this.write((s) => s.put(value, key)))) {
+      return this.legacy.set(key, value);
+    }
   }
 
   async remove(key: string): Promise<void> {
-    if (!(await this.write(s => s.delete(key)))) {return this.legacy.remove(key);}
+    if (!(await this.write((s) => s.delete(key)))) {
+      return this.legacy.remove(key);
+    }
   }
 }

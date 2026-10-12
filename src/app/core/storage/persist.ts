@@ -16,27 +16,38 @@ export class Persist {
     const s = signal<T>(fallback);
     let loaded = false;
     this.pending.push(
-      this.backend.get<unknown>(key).catch(() => undefined).then(stored => {
-        loaded = true;
-        // If something wrote before hydration finished, that newer value wins.
-        if (s() !== fallback) {this.save(key, s());}
-        else if (stored !== undefined) {
-          // Stored data may come from an older version or be corrupt: validate before use.
-          const value = validate ? validate(stored) : (stored as T);
-          if (value !== null && value !== undefined) {s.set(value);}
-        }
-      }),
+      this.backend
+        .get<unknown>(key)
+        .catch(() => undefined)
+        .then((stored) => {
+          loaded = true;
+          // If something wrote before hydration finished, that newer value wins.
+          if (s() !== fallback) {
+            this.save(key, s());
+          } else if (stored !== undefined) {
+            // Stored data may come from an older version or be corrupt: validate before use.
+            const value = validate ? validate(stored) : (stored as T);
+            if (value !== null && value !== undefined) {
+              s.set(value);
+            }
+          }
+        }),
     );
     effect(() => {
       const value = s();
-      if (loaded) {this.save(key, value);}
+      if (loaded) {
+        this.save(key, value);
+      }
     });
     return s;
   }
 
   private save<T>(key: string, value: T): void {
-    const op = value === null || value === undefined ? this.backend.remove(key) : this.backend.set(key, value);
-    op.catch(e => console.warn(`Storm Watch: could not save "${key}"`, e));
+    const op =
+      value === null || value === undefined
+        ? this.backend.remove(key)
+        : this.backend.set(key, value);
+    op.catch((e) => console.warn(`Storm Watch: could not save "${key}"`, e));
   }
 
   /** Resolves once every signal created so far has loaded its stored value. */

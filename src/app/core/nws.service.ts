@@ -64,28 +64,45 @@ export const DANGER_EVENTS =
  * CATASTROPHIC damage threat, so the event name alone is not enough.
  */
 export function isDanger(a: Pick<NwsAlert, 'event' | 'parameters'>): boolean {
-  if (DANGER_EVENTS.test(a.event)) {return true;}
+  if (DANGER_EVENTS.test(a.event)) {
+    return true;
+  }
   const p = a.parameters ?? {};
-  return [p['flashFloodDamageThreat'], p['tornadoDamageThreat']].some(v => v?.includes('CATASTROPHIC'));
+  return [p['flashFloodDamageThreat'], p['tornadoDamageThreat']].some((v) =>
+    v?.includes('CATASTROPHIC'),
+  );
 }
 
 /** Display name, upgrading CATASTROPHIC warnings to their "Emergency" name. */
 export function dangerLabel(a: Pick<NwsAlert, 'event' | 'parameters'>): string {
   const p = a.parameters ?? {};
-  if (p['tornadoDamageThreat']?.includes('CATASTROPHIC')) {return 'Tornado Emergency';}
-  if (p['flashFloodDamageThreat']?.includes('CATASTROPHIC')) {return 'Flash Flood Emergency';}
+  if (p['tornadoDamageThreat']?.includes('CATASTROPHIC')) {
+    return 'Tornado Emergency';
+  }
+  if (p['flashFloodDamageThreat']?.includes('CATASTROPHIC')) {
+    return 'Flash Flood Emergency';
+  }
   return a.event;
 }
 
-export const POLYGON_EVENTS = ['Tornado Warning', 'Severe Thunderstorm Warning', 'Flash Flood Warning', 'Extreme Wind Warning'];
+export const POLYGON_EVENTS = [
+  'Tornado Warning',
+  'Severe Thunderstorm Warning',
+  'Flash Flood Warning',
+  'Extreme Wind Warning',
+];
 
 const SEVERITY_RANK: Record<string, number> = { Extreme: 0, Severe: 1, Moderate: 2, Minor: 3 };
 
 /** The slices of api.weather.gov responses this app reads. */
-interface Value { value: number | null }
+interface Value {
+  value: number | null;
+}
 interface PointsResponse {
   properties: {
-    cwa: string; radarStation: string; observationStations: string;
+    cwa: string;
+    radarStation: string;
+    observationStations: string;
     relativeLocation?: { properties?: { city?: string; state?: string } };
   };
 }
@@ -93,13 +110,23 @@ interface AlertsResponse {
   features: { properties: NwsAlert; geometry: Geometry | null }[];
 }
 interface StationsResponse {
-  features: { properties: { stationIdentifier: string; name: string }; geometry: { coordinates: [number, number] } | null }[];
+  features: {
+    properties: { stationIdentifier: string; name: string };
+    geometry: { coordinates: [number, number] } | null;
+  }[];
 }
 interface ObservationResponse {
   properties: {
-    timestamp: string; textDescription: string;
-    temperature?: Value; heatIndex?: Value; windChill?: Value; relativeHumidity?: Value;
-    windSpeed?: Value; windGust?: Value; windDirection?: Value; barometricPressure?: Value;
+    timestamp: string;
+    textDescription: string;
+    temperature?: Value;
+    heatIndex?: Value;
+    windChill?: Value;
+    relativeHumidity?: Value;
+    windSpeed?: Value;
+    windGust?: Value;
+    windDirection?: Value;
+    barometricPressure?: Value;
   };
 }
 
@@ -107,7 +134,9 @@ interface ObservationResponse {
 export class NwsService {
   private async get<T>(url: string): Promise<T> {
     const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!r.ok) {throw new Error(`NWS ${r.status} for ${url}`);}
+    if (!r.ok) {
+      throw new Error(`NWS ${r.status} for ${url}`);
+    }
     return r.json() as Promise<T>;
   }
 
@@ -124,17 +153,22 @@ export class NwsService {
   }
 
   async alertsAt(lat: number, lon: number): Promise<NwsAlert[]> {
-    const d = await this.get<AlertsResponse>(`${NWS}/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`);
+    const d = await this.get<AlertsResponse>(
+      `${NWS}/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
+    );
     return d.features
-      .map(f => f.properties)
+      .map((f) => f.properties)
       .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 4) - (SEVERITY_RANK[b.severity] ?? 4));
   }
 
   async warningShapes(): Promise<WarningShape[]> {
     const ev = POLYGON_EVENTS.map(encodeURIComponent).join(',');
     const d = await this.get<AlertsResponse>(`${NWS}/alerts/active?status=actual&event=${ev}`);
-    return d.features.flatMap(f =>
-      f.geometry ? [{ event: f.properties.event, headline: f.properties.headline, geometry: f.geometry }] : []);
+    return d.features.flatMap((f) =>
+      f.geometry
+        ? [{ event: f.properties.event, headline: f.properties.headline, geometry: f.geometry }]
+        : [],
+    );
   }
 
   /**
@@ -145,7 +179,7 @@ export class NwsService {
     const stations = await this.get<StationsResponse>(stationsUrl);
     // The list is not sorted by distance (the first entry can be 100 mi away), so sort it here.
     const candidates = stations.features
-      .map(f => {
+      .map((f) => {
         const c = f.geometry?.coordinates;
         return { ...f.properties, distanceMi: c ? miles(lat, lon, c[1], c[0]) : Infinity };
       })
@@ -154,16 +188,29 @@ export class NwsService {
     let found: { s: (typeof candidates)[number]; obs: ObservationResponse } | undefined;
     for (const s of candidates) {
       let obs: ObservationResponse;
-      try { obs = await this.get<ObservationResponse>(`${NWS}/stations/${s.stationIdentifier}/observations/latest`); } catch { continue; }
+      try {
+        obs = await this.get<ObservationResponse>(
+          `${NWS}/stations/${s.stationIdentifier}/observations/latest`,
+        );
+      } catch {
+        continue;
+      }
       found ??= { s, obs };
       const age = Date.now() - Date.parse(obs.properties.timestamp);
-      if (age < OBS_STALE_MS && obs.properties.temperature?.value != null) { found = { s, obs }; break; }
+      if (age < OBS_STALE_MS && obs.properties.temperature?.value != null) {
+        found = { s, obs };
+        break;
+      }
     }
-    if (!found) {throw new Error('No NWS station near this location is reporting');}
+    if (!found) {
+      throw new Error('No NWS station near this location is reporting');
+    }
     const { s: first, obs: d } = found;
     const p = d.properties;
-    const cToF = (v: number | null | undefined) => (v == null ? null : Math.round((v * 9) / 5 + 32));
-    const kmhToMph = (v: number | null | undefined) => (v == null ? null : Math.round(v * 0.621371));
+    const cToF = (v: number | null | undefined) =>
+      v == null ? null : Math.round((v * 9) / 5 + 32);
+    const kmhToMph = (v: number | null | undefined) =>
+      v == null ? null : Math.round(v * 0.621371);
     return {
       station: first.stationIdentifier,
       stationName: first.name,
@@ -176,7 +223,10 @@ export class NwsService {
       windMph: kmhToMph(p.windSpeed?.value),
       gustMph: kmhToMph(p.windGust?.value),
       windDir: p.windDirection?.value ?? null,
-      pressureInHg: p.barometricPressure?.value == null ? null : +(p.barometricPressure.value / 3386.39).toFixed(2),
+      pressureInHg:
+        p.barometricPressure?.value == null
+          ? null
+          : +(p.barometricPressure.value / 3386.39).toFixed(2),
     };
   }
 }

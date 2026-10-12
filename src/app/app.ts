@@ -12,7 +12,7 @@ import { ShareService } from './core/share';
   templateUrl: './app.html',
   styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { '[class.kiosk]': 'kiosk()' }
+  host: { '[class.kiosk]': 'kiosk()' },
 })
 export class App {
   protected readonly alerts = inject(AlertsStore);
@@ -31,8 +31,10 @@ export class App {
     const tick = setInterval(() => this.clock.set(new Date()), 1000);
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
 
-    this.router.events.pipe(takeUntilDestroyed()).subscribe(e => {
-      if (!(e instanceof NavigationEnd)) {return;}
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((e) => {
+      if (!(e instanceof NavigationEnd)) {
+        return;
+      }
       const tree = this.router.parseUrl(this.router.url);
       const path = this.router.url.split(/[?#]/)[0];
       this.onBoard.set(path === '/' || path.startsWith('/d/'));
@@ -40,7 +42,9 @@ export class App {
       const k = params.get('kiosk');
       this.kiosk.set(k !== null && k !== '0' && k !== 'false');
       const cfg = params.get('cfg');
-      if (cfg) {void this.applyShare(cfg);}
+      if (cfg) {
+        void this.applyShare(cfg);
+      }
     });
   }
 
@@ -48,11 +52,17 @@ export class App {
   private async applyShare(cfg: string): Promise<void> {
     try {
       const applied = await this.share.apply(cfg);
-      if (applied) {this.notice.set('Shared setup applied.');}
+      if (applied) {
+        this.notice.set('Shared setup applied.');
+      }
     } catch (e) {
       this.notice.set(`Could not apply share link: ${(e as Error).message}`);
     }
-    await this.router.navigate([], { queryParams: { cfg: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    await this.router.navigate([], {
+      queryParams: { cfg: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
     setTimeout(() => this.notice.set(null), 6000);
   }
 }

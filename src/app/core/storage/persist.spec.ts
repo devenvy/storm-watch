@@ -6,9 +6,15 @@ import { STORAGE_BACKEND, type StorageBackend } from './storage-backend';
 class MemoryBackend implements StorageBackend {
   readonly name = 'memory';
   readonly data = new Map<string, unknown>();
-  async get<T>(key: string) { return this.data.get(key) as T | undefined; }
-  async set<T>(key: string, value: T) { this.data.set(key, value); }
-  async remove(key: string) { this.data.delete(key); }
+  async get<T>(key: string) {
+    return this.data.get(key) as T | undefined;
+  }
+  async set<T>(key: string, value: T) {
+    this.data.set(key, value);
+  }
+  async remove(key: string) {
+    this.data.delete(key);
+  }
 }
 
 describe('Persist', () => {
@@ -17,16 +23,20 @@ describe('Persist', () => {
 
   beforeEach(() => {
     backend = new MemoryBackend();
-    TestBed.configureTestingModule({ providers: [{ provide: STORAGE_BACKEND, useValue: backend }] });
+    TestBed.configureTestingModule({
+      providers: [{ provide: STORAGE_BACKEND, useValue: backend }],
+    });
     persist = TestBed.inject(Persist);
   });
 
-  const make = <T>(key: string, fallback: T) => TestBed.runInInjectionContext(() => persist.signal(key, fallback));
+  const make = <T>(key: string, fallback: T) =>
+    TestBed.runInInjectionContext(() => persist.signal(key, fallback));
 
   it('rejects stored values that fail validation', async () => {
     backend.data.set('v', 'garbage');
     const s = TestBed.runInInjectionContext(() =>
-      persist.signal<number[]>('v', [1], x => (Array.isArray(x) ? (x as number[]) : null)));
+      persist.signal<number[]>('v', [1], (x) => (Array.isArray(x) ? (x as number[]) : null)),
+    );
     await persist.ready();
     expect(s()).toEqual([1]);
   });

@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, effect, type ElementRef, input, type OnDestroy, output, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  type ElementRef,
+  input,
+  type OnDestroy,
+  output,
+  viewChild,
+} from '@angular/core';
 import Hls from 'hls.js';
 import mpegts from 'mpegts.js';
 
@@ -23,22 +32,36 @@ const kinds = new Map<string, StreamKind>();
  * response (content type, or a playlist's #EXTM3U header) and closing it straight away.
  */
 async function streamKind(url: string): Promise<StreamKind> {
-  if (/\.m3u8(\?|$)/i.test(url)) {return 'hls';}
-  if (/\.ts(\?|$)/i.test(url)) {return 'ts';}
+  if (/\.m3u8(\?|$)/i.test(url)) {
+    return 'hls';
+  }
+  if (/\.ts(\?|$)/i.test(url)) {
+    return 'ts';
+  }
   const known = kinds.get(url);
-  if (known) {return known;}
+  if (known) {
+    return known;
+  }
   try {
     const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
     let kind: StreamKind = 'ts';
-    if (/mpegurl/i.test(r.headers.get('content-type') ?? '')) {kind = 'hls';}
-    else {
+    if (/mpegurl/i.test(r.headers.get('content-type') ?? '')) {
+      kind = 'hls';
+    } else {
       const reader = r.body?.getReader();
       const first = await reader?.read();
-      if (first?.value && new TextDecoder().decode(first.value.subarray(0, 16)).startsWith('#EXTM3U')) {kind = 'hls';}
+      if (
+        first?.value &&
+        new TextDecoder().decode(first.value.subarray(0, 16)).startsWith('#EXTM3U')
+      ) {
+        kind = 'hls';
+      }
       await reader?.cancel();
     }
     // Only remember real answers; a failed probe is retried on the next (re)connect.
-    if (r.ok) {kinds.set(url, kind);}
+    if (r.ok) {
+      kinds.set(url, kind);
+    }
     return kind;
   } catch {
     // Unreachable or no CORS: fall back to MPEG-TS and let the player report errors.
@@ -55,10 +78,18 @@ async function streamKind(url: string): Promise<StreamKind> {
   selector: 'sw-player',
   template: `<video #video controls autoplay playsinline [muted]="muted()"></video>`,
   styles: `
-    :host { display: block; background: #000; }
-    video { width: 100%; height: 100%; display: block; background: #000; }
+    :host {
+      display: block;
+      background: #000;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
   `,
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Player implements OnDestroy {
   readonly url = input<string | null>(null);
@@ -93,7 +124,14 @@ export class Player implements OnDestroy {
     this.hls?.destroy();
     this.hls = null;
     if (this.ts) {
-      try { this.ts.pause(); this.ts.unload(); this.ts.detachMediaElement(); this.ts.destroy(); } catch { /* already gone */ }
+      try {
+        this.ts.pause();
+        this.ts.unload();
+        this.ts.detachMediaElement();
+        this.ts.destroy();
+      } catch {
+        /* already gone */
+      }
       this.ts = null;
     }
     const v = this.video().nativeElement;
@@ -105,7 +143,9 @@ export class Player implements OnDestroy {
   /** Tear down and reconnect after an exponential backoff. */
   private reconnect(reason: string): void {
     const url = this.url();
-    if (!url) {return;}
+    if (!url) {
+      return;
+    }
     this.teardown();
     this.attempt++;
     const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (this.attempt - 1));
@@ -117,16 +157,26 @@ export class Player implements OnDestroy {
     this.teardown();
     const run = ++this.run;
     this.mediaRecoveries = 0;
-    if (!url) { this.status.emit({ state: 'idle' }); return; }
-    const v = this.video().nativeElement;
-    if (location.protocol === 'https:' && url.startsWith('http:')) {
-      this.status.emit({ state: 'error', message: 'Stream is http on an https page (mixed content).' });
+    if (!url) {
+      this.status.emit({ state: 'idle' });
       return;
     }
-    if (!this.attempt) {this.status.emit({ state: 'loading' });}
+    const v = this.video().nativeElement;
+    if (location.protocol === 'https:' && url.startsWith('http:')) {
+      this.status.emit({
+        state: 'error',
+        message: 'Stream is http on an https page (mixed content).',
+      });
+      return;
+    }
+    if (!this.attempt) {
+      this.status.emit({ state: 'loading' });
+    }
     const kind = await streamKind(url);
     // The channel changed (or the player was destroyed) while we were detecting the format.
-    if (run !== this.run) {return;}
+    if (run !== this.run) {
+      return;
+    }
 
     let detail: string | undefined;
     v.onplaying = () => {
@@ -147,10 +197,14 @@ export class Player implements OnDestroy {
           fragLoadingMaxRetry: 6,
         }));
         hls.on(Hls.Events.ERROR, (_e, d) => {
-          if (!d.fatal) {return;}
+          if (!d.fatal) {
+            return;
+          }
           if (d.type === Hls.ErrorTypes.MEDIA_ERROR && this.mediaRecoveries < 2) {
             // First try a plain recovery, then one with codec swap, before a full reload.
-            if (this.mediaRecoveries++ === 1) {hls.swapAudioCodec();}
+            if (this.mediaRecoveries++ === 1) {
+              hls.swapAudioCodec();
+            }
             hls.recoverMediaError();
             return;
           }
@@ -168,10 +222,17 @@ export class Player implements OnDestroy {
     } else if (mpegts.isSupported()) {
       const p = (this.ts = mpegts.createPlayer(
         { type: 'mpegts', isLive: true, url },
-        { enableWorker: true, liveBufferLatencyChasing: true, lazyLoad: false, autoCleanupSourceBuffer: true },
+        {
+          enableWorker: true,
+          liveBufferLatencyChasing: true,
+          lazyLoad: false,
+          autoCleanupSourceBuffer: true,
+        },
       ));
       p.on(mpegts.Events.ERROR, (type: string, d: string) => this.reconnect(`${type}: ${d}`));
-      p.on(mpegts.Events.MEDIA_INFO, (mi: { videoCodec?: string; audioCodec?: string }) => { detail = `${mi.videoCodec ?? '?'} / ${mi.audioCodec ?? '?'}`; });
+      p.on(mpegts.Events.MEDIA_INFO, (mi: { videoCodec?: string; audioCodec?: string }) => {
+        detail = `${mi.videoCodec ?? '?'} / ${mi.audioCodec ?? '?'}`;
+      });
       p.attachMediaElement(v);
       p.load();
     } else {
@@ -179,7 +240,9 @@ export class Player implements OnDestroy {
       return;
     }
 
-    v.play()?.catch(() => this.status.emit({ state: 'error', message: 'Autoplay blocked: press play.' }));
+    v.play()?.catch(() =>
+      this.status.emit({ state: 'error', message: 'Autoplay blocked: press play.' }),
+    );
     this.startWatchdog();
   }
 
@@ -189,14 +252,21 @@ export class Player implements OnDestroy {
     this.lastTime = -1;
     this.lastProgress = Date.now();
     this.watchdog = setInterval(() => {
-      if (v.paused) { this.lastProgress = Date.now(); return; }
+      if (v.paused) {
+        this.lastProgress = Date.now();
+        return;
+      }
       if (v.currentTime !== this.lastTime) {
         this.lastTime = v.currentTime;
         this.lastProgress = Date.now();
-        if (this.attempt && this.healthySince && Date.now() - this.healthySince > HEALTHY_MS) {this.attempt = 0;}
+        if (this.attempt && this.healthySince && Date.now() - this.healthySince > HEALTHY_MS) {
+          this.attempt = 0;
+        }
         return;
       }
-      if (Date.now() - this.lastProgress > STALL_MS) {this.reconnect('playback stalled');}
+      if (Date.now() - this.lastProgress > STALL_MS) {
+        this.reconnect('playback stalled');
+      }
     }, WATCHDOG_MS);
   }
 

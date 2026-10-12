@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, model, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  model,
+  output,
+} from '@angular/core';
 
 import { AlertsStore } from '../../core/alerts.store';
 import { RADAR_SOURCES, type RadarSourceId } from '../../core/radar-sources';
@@ -14,25 +22,47 @@ import type { HomeLocation } from '../../core/settings.store';
     <h2>
       <span class="title">Radar</span>
       <select class="meta src" aria-label="Radar source" (change)="pick($event)">
-        @for (s of sources; track s.id) { <option [value]="s.id" [selected]="s.id === source()">{{ s.label }}</option> }
+        @for (s of sources; track s.id) {
+          <option [value]="s.id" [selected]="s.id === source()">{{ s.label }}</option>
+        }
       </select>
       <sw-card-buttons [card]="card" />
     </h2>
     @if (source() !== 'site-gif') {
-      <sw-radar-map [center]="[location().lat, location().lon]" [shapes]="alerts.shapes()"
-        [source]="source()" [station]="location().radarStation" />
+      <sw-radar-map
+        [center]="[location().lat, location().lon]"
+        [shapes]="alerts.shapes()"
+        [source]="source()"
+        [station]="location().radarStation"
+      />
     } @else {
-      <img class="site" alt="Local single-site radar loop" [src]="loop()">
+      <img class="site" alt="Local single-site radar loop" [src]="loop()" />
     }
   `,
   styles: `
-    sw-radar-map { flex: 1; min-height: 0; }
-    .site { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: #000; border-radius: 6px; }
-    .src { padding: 2px 6px; font-size: 12px; text-transform: none; letter-spacing: 0; max-width: 60%; }
+    sw-radar-map {
+      flex: 1;
+      min-height: 0;
+    }
+    .site {
+      flex: 1;
+      min-height: 0;
+      width: 100%;
+      object-fit: contain;
+      background: #000;
+      border-radius: 6px;
+    }
+    .src {
+      padding: 2px 6px;
+      font-size: 12px;
+      text-transform: none;
+      letter-spacing: 0;
+      max-width: 60%;
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'panel widget' },
-  hostDirectives: [Expandable]
+  hostDirectives: [Expandable],
 })
 export class RadarWidget {
   protected readonly alerts = inject(AlertsStore);
@@ -41,10 +71,11 @@ export class RadarWidget {
 
   readonly location = input.required<HomeLocation>();
   readonly source = model<RadarSourceId>('blend');
-  
 
-  protected readonly loop = computed(() =>
-    `https://radar.weather.gov/ridge/standard/${this.location().radarStation}_loop.gif?_=${this.alerts.updatedAt()?.getTime() ?? 0}`);
+  protected readonly loop = computed(
+    () =>
+      `https://radar.weather.gov/ridge/standard/${this.location().radarStation}_loop.gif?_=${this.alerts.updatedAt()?.getTime() ?? 0}`,
+  );
 
   protected pick(e: Event): void {
     this.source.set((e.target as HTMLSelectElement).value as RadarSourceId);

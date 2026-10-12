@@ -22,7 +22,8 @@ export interface RadarSet {
   note?: string;
 }
 
-export type RadarSourceId = 'blend' | 'mosaic' | 'hrrr' | 'site-ref' | 'site-vel' | 'rainviewer' | 'site-gif';
+export type RadarSourceId =
+  'blend' | 'mosaic' | 'hrrr' | 'site-ref' | 'site-vel' | 'rainviewer' | 'site-gif';
 
 export interface RadarSourceInfo {
   id: RadarSourceId;
@@ -42,10 +43,19 @@ export const RADAR_SOURCES: RadarSourceInfo[] = [
 ];
 
 /** The slices of the upstream metadata responses this file reads. */
-interface MosaicMeta { meta: { valid: string } }
-interface HrrrMeta { model_init_utc: string }
-interface ScanList { scans: { ts: string }[] }
-interface RainViewerMaps { host: string; radar: { past: { time: number; path: string }[] } }
+interface MosaicMeta {
+  meta: { valid: string };
+}
+interface HrrrMeta {
+  model_init_utc: string;
+}
+interface ScanList {
+  scans: { ts: string }[];
+}
+interface RainViewerMaps {
+  host: string;
+  radar: { past: { time: number; path: string }[] };
+}
 
 const MIN = 60_000;
 const MOSAIC_OFFSETS = [50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0];
@@ -57,7 +67,9 @@ function ymdhm(d: Date): string {
 
 async function json<T>(url: string): Promise<T> {
   const r = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!r.ok) {throw new Error(`${r.status} ${url}`);}
+  if (!r.ok) {
+    throw new Error(`${r.status} ${url}`);
+  }
   return r.json() as Promise<T>;
 }
 
@@ -66,13 +78,20 @@ async function json<T>(url: string): Promise<T> {
 export class RadarSources {
   async load(id: RadarSourceId, radarStation: string): Promise<RadarSet> {
     switch (id) {
-      case 'mosaic': return this.mosaic();
-      case 'hrrr': return this.hrrr(null);
-      case 'blend': return this.blend();
-      case 'site-ref': return this.site(radarStation, 'N0B');
-      case 'site-vel': return this.site(radarStation, 'N0S');
-      case 'rainviewer': return this.rainviewer();
-      case 'site-gif': return { frames: [], startIndex: 0 };
+      case 'mosaic':
+        return this.mosaic();
+      case 'hrrr':
+        return this.hrrr(null);
+      case 'blend':
+        return this.blend();
+      case 'site-ref':
+        return this.site(radarStation, 'N0B');
+      case 'site-vel':
+        return this.site(radarStation, 'N0S');
+      case 'rainviewer':
+        return this.rainviewer();
+      case 'site-gif':
+        return { frames: [], startIndex: 0 };
     }
   }
 
@@ -81,7 +100,7 @@ export class RadarSources {
     const meta = await json<MosaicMeta>(`${IEM}/data/gis/images/4326/USCOMP/n0q_0.json`);
     const latest = new Date(meta.meta.valid);
     const bust = latest.getTime();
-    const frames = MOSAIC_OFFSETS.map(o => ({
+    const frames = MOSAIC_OFFSETS.map((o) => ({
       time: new Date(latest.getTime() - o * MIN),
       url: `${IEM_TILES}/nexrad-n0q-900913${o ? `-m${String(o).padStart(2, '0')}m` : ''}/{z}/{x}/{y}.png?_=${bust}`,
       kind: 'past' as const,
@@ -102,7 +121,9 @@ export class RadarSources {
     const frames: RadarFrame[] = [];
     for (let m = 0; m <= 18 * 60; m += 15) {
       const t = init.getTime() + m * MIN;
-      if (t <= from || t > end) {continue;}
+      if (t <= from || t > end) {
+        continue;
+      }
       frames.push({
         time: new Date(t),
         url: `${IEM_TILES}/hrrr::REFD-F${String(m).padStart(4, '0')}-0/{z}/{x}/{y}.png?_=${init.getTime()}`,
@@ -120,8 +141,15 @@ export class RadarSources {
   private async blend(): Promise<RadarSet> {
     const past = await this.mosaic();
     const last = past.frames[past.frames.length - 1].time;
-    const future = await this.hrrr(last).catch(() => ({ frames: [] as RadarFrame[], note: 'Forecast unavailable' }));
-    return { frames: [...past.frames, ...future.frames], startIndex: past.startIndex, note: future.note };
+    const future = await this.hrrr(last).catch(() => ({
+      frames: [] as RadarFrame[],
+      note: 'Forecast unavailable',
+    }));
+    return {
+      frames: [...past.frames, ...future.frames],
+      startIndex: past.startIndex,
+      note: future.note,
+    };
   }
 
   /** Single-site super-res products with real scan times (~4-6 min apart), last hour. */
@@ -129,24 +157,35 @@ export class RadarSources {
     const id = station.length === 4 ? station.slice(1) : station;
     const end = new Date();
     const start = new Date(end.getTime() - 60 * MIN);
-    const iso = (d: Date) => `${d.toISOString().slice(0, 17)  }00Z`;
-    const d = await json<ScanList>(`${IEM}/json/radar.py?operation=list&radar=${id}&product=${product}&start=${iso(start)}&end=${iso(end)}`);
-    const frames = d.scans.map(s => {
+    const iso = (d: Date) => `${d.toISOString().slice(0, 17)}00Z`;
+    const d = await json<ScanList>(
+      `${IEM}/json/radar.py?operation=list&radar=${id}&product=${product}&start=${iso(start)}&end=${iso(end)}`,
+    );
+    const frames = d.scans.map((s) => {
       const t = new Date(s.ts);
-      return { time: t, url: `${IEM_TILES}/ridge::${id}-${product}-${ymdhm(t)}/{z}/{x}/{y}.png`, kind: 'past' as const };
+      return {
+        time: t,
+        url: `${IEM_TILES}/ridge::${id}-${product}-${ymdhm(t)}/{z}/{x}/{y}.png`,
+        kind: 'past' as const,
+      };
     });
-    if (!frames.length) {throw new Error(`No recent ${product} scans from ${station}`);}
+    if (!frames.length) {
+      throw new Error(`No recent ${product} scans from ${station}`);
+    }
     return {
       frames,
       startIndex: frames.length - 1,
-      note: product === 'N0S' ? 'Storm-relative velocity: tight red/green couplets indicate rotation' : undefined,
+      note:
+        product === 'N0S'
+          ? 'Storm-relative velocity: tight red/green couplets indicate rotation'
+          : undefined,
     };
   }
 
   /** RainViewer composite: 2 h of history; tiles only render to zoom 7. */
   private async rainviewer(): Promise<RadarSet> {
     const d = await json<RainViewerMaps>('https://api.rainviewer.com/public/weather-maps.json');
-    const frames = d.radar.past.map(f => ({
+    const frames = d.radar.past.map((f) => ({
       time: new Date(f.time * 1000),
       url: `${d.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
       kind: 'past' as const,

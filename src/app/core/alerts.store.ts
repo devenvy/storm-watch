@@ -3,7 +3,14 @@ import { Router } from '@angular/router';
 
 import { AmbientService, type PwsStation, STALE_MS } from './ambient.service';
 import { NhcService, type Storm } from './nhc.service';
-import { dangerLabel, isDanger, type NwsAlert, NwsService, type Observation, type WarningShape } from './nws.service';
+import {
+  dangerLabel,
+  isDanger,
+  type NwsAlert,
+  NwsService,
+  type Observation,
+  type WarningShape,
+} from './nws.service';
 import { SettingsStore } from './settings.store';
 import { Persist } from './storage/persist';
 import { LineupStore } from '../iptv/lineup.store';
@@ -51,7 +58,7 @@ export class AlertsStore {
   readonly station = computed(() => {
     const list = this.stations();
     const pin = this.settings.pws();
-    return (pin && list.find(s => s.id === pin)) || list[0] || null;
+    return (pin && list.find((s) => s.id === pin)) || list[0] || null;
   });
   readonly feeds = signal<Record<Feed, FeedState>>(EMPTY);
 
@@ -59,9 +66,13 @@ export class AlertsStore {
   readonly updatedAt = computed(() => this.feeds().alerts.okAt);
   readonly error = computed(() => {
     const f = this.feeds();
-    if (f.alerts.error) {return f.alerts.okAt ? 'Alert feed unreachable, retrying (showing last good data)' : 'Alert feed unreachable, retrying';}
+    if (f.alerts.error) {
+      return f.alerts.okAt
+        ? 'Alert feed unreachable, retrying (showing last good data)'
+        : 'Alert feed unreachable, retrying';
+    }
     // Home stations are a bonus feed; their outage is shown in the conditions card only.
-    const failed = (Object.keys(f) as Feed[]).filter(k => k !== 'pws' && f[k].error).length;
+    const failed = (Object.keys(f) as Feed[]).filter((k) => k !== 'pws' && f[k].error).length;
     return failed ? `${failed} feed(s) failed, retrying` : null;
   });
 
@@ -69,8 +80,9 @@ export class AlertsStore {
   readonly dangerEvents = computed(() => [...new Set(this.danger().map(dangerLabel))]);
 
   /** Alert ids already announced, so reloads don't re-beep old alerts. */
-  private readonly seen = this.persist.signal<string[]>('sw.seenAlerts', [],
-    v => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-300) : null));
+  private readonly seen = this.persist.signal<string[]>('sw.seenAlerts', [], (v) =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-300) : null,
+  );
   private audio: AudioContext | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
   private stormsAt = 0;
@@ -97,7 +109,9 @@ export class AlertsStore {
       this.observation.set(null);
       this.stations.set([]);
       this.feeds.set(EMPTY);
-      if (!loc || !ready) {return;}
+      if (!loc || !ready) {
+        return;
+      }
       // Untracked: refresh reads other signals (e.g. stations), which must not re-run this effect.
       untracked(() => void this.refresh());
       this.timer = setInterval(async () => this.refresh(), POLL_MS);
@@ -106,37 +120,88 @@ export class AlertsStore {
 
   async refresh(): Promise<void> {
     const loc = this.settings.location();
-    if (!loc) {return;}
+    if (!loc) {
+      return;
+    }
     const gen = this.generation;
     const current = () => gen === this.generation;
     this.pruneStations();
 
-    const track = async <T>(feed: Feed, run: () => Promise<T>, apply: (v: T) => void): Promise<void> => {
-      if (this.busy.has(feed)) {return Promise.resolve();}
+    const track = async <T>(
+      feed: Feed,
+      run: () => Promise<T>,
+      apply: (v: T) => void,
+    ): Promise<void> => {
+      if (this.busy.has(feed)) {
+        return Promise.resolve();
+      }
       this.busy.add(feed);
-      return run().then(
-        v => {
-          if (!current()) {return;}
-          apply(v);
-          this.feeds.update(f => ({ ...f, [feed]: { okAt: new Date(), error: null } }));
-        },
-        (e: unknown) => {
-          if (!current()) {return;}
-          this.feeds.update(f => ({ ...f, [feed]: { ...f[feed], error: (e as Error)?.message ?? 'failed' } }));
-        },
-      ).finally(() => { if (current()) {this.busy.delete(feed);} });
+      return run()
+        .then(
+          (v) => {
+            if (!current()) {
+              return;
+            }
+            apply(v);
+            this.feeds.update((f) => ({ ...f, [feed]: { okAt: new Date(), error: null } }));
+          },
+          (e: unknown) => {
+            if (!current()) {
+              return;
+            }
+            this.feeds.update((f) => ({
+              ...f,
+              [feed]: { ...f[feed], error: (e as Error)?.message ?? 'failed' },
+            }));
+          },
+        )
+        .finally(() => {
+          if (current()) {
+            this.busy.delete(feed);
+          }
+        });
     };
 
     const jobs = [
-      track('alerts', async () => this.nws.alertsAt(loc.lat, loc.lon), a => this.onAlerts(a)),
-      track('shapes', async () => this.nws.warningShapes(), s => this.shapes.set(s)),
-      track('observation', async () => this.nws.latestObservation(loc.stationsUrl, loc.lat, loc.lon), o => this.observation.set(o)),
+      track(
+        'alerts',
+        async () => this.nws.alertsAt(loc.lat, loc.lon),
+        (a) => this.onAlerts(a),
+      ),
+      track(
+        'shapes',
+        async () => this.nws.warningShapes(),
+        (s) => this.shapes.set(s),
+      ),
+      track(
+        'observation',
+        async () => this.nws.latestObservation(loc.stationsUrl, loc.lat, loc.lon),
+        (o) => this.observation.set(o),
+      ),
     ];
     if (Date.now() - this.stormsAt >= STORM_POLL_MS) {
-      jobs.push(track('storms', async () => this.nhc.activeStorms(), s => { this.storms.set(s); this.stormsAt = Date.now(); }));
+      jobs.push(
+        track(
+          'storms',
+          async () => this.nhc.activeStorms(),
+          (s) => {
+            this.storms.set(s);
+            this.stormsAt = Date.now();
+          },
+        ),
+      );
     }
     if (Date.now() - this.pwsAt >= PWS_POLL_MS) {
-      jobs.push(track('pws', async () => this.ambient.nearby(loc.lat, loc.lon), s => { this.stations.set(s); this.pwsAt = Date.now(); }));
+      jobs.push(
+        track(
+          'pws',
+          async () => this.ambient.nearby(loc.lat, loc.lon),
+          (s) => {
+            this.stations.set(s);
+            this.pwsAt = Date.now();
+          },
+        ),
+      );
     }
     await Promise.all(jobs);
   }
@@ -144,20 +209,24 @@ export class AlertsStore {
   /** Drop home-station readings that have gone stale, e.g. while the Ambient feed is unreachable. */
   private pruneStations(): void {
     const cutoff = Date.now() - STALE_MS;
-    if (this.stations().some(s => s.at < cutoff)) {this.stations.update(list => list.filter(s => s.at >= cutoff));}
+    if (this.stations().some((s) => s.at < cutoff)) {
+      this.stations.update((list) => list.filter((s) => s.at >= cutoff));
+    }
   }
 
   private onAlerts(alerts: NwsAlert[]): void {
     const firstLoad = this.feeds().alerts.okAt === null;
     this.alerts.set(alerts);
     const seen = new Set(this.seen());
-    const fresh = alerts.filter(a => !seen.has(a.id));
-    if (fresh.length) {this.seen.set([...seen, ...fresh.map(a => a.id)].slice(-300));}
+    const fresh = alerts.filter((a) => !seen.has(a.id));
+    if (fresh.length) {
+      this.seen.set([...seen, ...fresh.map((a) => a.id)].slice(-300));
+    }
 
     const freshDanger = fresh.filter(isDanger);
     if (freshDanger.length) {
       this.beep(6);
-      freshDanger.forEach(a => this.notify(dangerLabel(a), a.headline));
+      freshDanger.forEach((a) => this.notify(dangerLabel(a), a.headline));
       const def = this.lineup.defaultChannel();
       // Stay on the Watch page or current dashboard if already there; otherwise open the first dashboard.
       // Existing query params (kiosk) are kept.
@@ -167,12 +236,15 @@ export class AlertsStore {
           this.router.navigate(['/watch', def.key], { queryParamsHandling: 'preserve' });
         } else {
           const commands = path === '/' || path.startsWith('/d/') ? [] : ['/'];
-          this.router.navigate(commands, { queryParams: { ch: def.key }, queryParamsHandling: 'merge' });
+          this.router.navigate(commands, {
+            queryParams: { ch: def.key },
+            queryParamsHandling: 'merge',
+          });
         }
       }
     } else if (fresh.length && !firstLoad) {
       this.beep(1);
-      fresh.forEach(a => this.notify(`New alert: ${  a.event}`, a.headline));
+      fresh.forEach((a) => this.notify(`New alert: ${a.event}`, a.headline));
     }
   }
 
@@ -180,14 +252,22 @@ export class AlertsStore {
   async arm(): Promise<void> {
     this.audio ??= new AudioContext();
     await this.audio.resume();
-    try { if ('Notification' in window) {await Notification.requestPermission();} } catch { /* unsupported */ }
+    try {
+      if ('Notification' in window) {
+        await Notification.requestPermission();
+      }
+    } catch {
+      /* unsupported */
+    }
     this.settings.soundArmed.set(true);
     this.beep(1);
   }
 
   beep(n: number): void {
     const ctx = this.audio;
-    if (!ctx) {return;}
+    if (!ctx) {
+      return;
+    }
     for (let i = 0; i < n; i++) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -206,6 +286,8 @@ export class AlertsStore {
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification(title, { body, requireInteraction: true });
       }
-    } catch { /* some mobile browsers require a service worker */ }
+    } catch {
+      /* some mobile browsers require a service worker */
+    }
   }
 }

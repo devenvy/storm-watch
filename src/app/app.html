@@ -1,6 +1,7 @@
 @if (alerts.danger().length) {
   <div class="banner" role="alert">
-    ⚠ {{ alerts.dangerEvents().join(' · ') }} for {{ settings.location()?.label }}. If a Tornado Warning is in effect, take shelter now.
+    ⚠ {{ alerts.dangerEvents().join(' · ') }} for {{ settings.location()?.label }}. If a Tornado
+    Warning is in effect, take shelter now.
   </div>
 }
 @if (!kiosk()) {
@@ -22,7 +23,9 @@
   <!-- Browsers only allow sound after a tap/click, even in kiosk mode. -->
   <button class="arm kiosk-arm" (click)="alerts.arm()">🔔 Tap to enable alert sounds</button>
 }
-@if (notice()) { <div class="notice" role="status">{{ notice() }}</div> }
+@if (notice()) {
+  <div class="notice" role="status">{{ notice() }}</div>
+}
 <main>
   <router-outlet />
 </main>

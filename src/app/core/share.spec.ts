@@ -4,8 +4,14 @@ import { decodePayload, encodePayload, type SharePayload } from './share';
 import { sanitizeLineup, sanitizeSource } from '../iptv/validate';
 
 const loc = {
-  lat: 31.22, lon: -85.39, label: 'Dothan, AL', city: 'Dothan', state: 'AL',
-  office: 'TAE', radarStation: 'KEOX', stationsUrl: 'https://api.weather.gov/gridpoints/TAE/1,2/stations',
+  lat: 31.22,
+  lon: -85.39,
+  label: 'Dothan, AL',
+  city: 'Dothan',
+  state: 'AL',
+  office: 'TAE',
+  radarStation: 'KEOX',
+  stationsUrl: 'https://api.weather.gov/gridpoints/TAE/1,2/stations',
 };
 
 describe('share links', () => {
@@ -18,7 +24,7 @@ describe('share links', () => {
 
   it('rejects unknown formats and oversize input', async () => {
     await expect(decodePayload('xabc')).rejects.toThrow();
-    await expect(decodePayload(`j${  'a'.repeat(70_000)}`)).rejects.toThrow(/too large/);
+    await expect(decodePayload(`j${'a'.repeat(70_000)}`)).rejects.toThrow(/too large/);
   });
 
   it('stops decompressing a zip bomb at the size limit', async () => {
@@ -37,8 +43,21 @@ describe('share links', () => {
 
   it('only accepts http(s) URLs for IPTV sources and channels', () => {
     expect(sanitizeSource({ kind: 'm3u', url: 'javascript:alert(1)' })).toBeNull();
-    expect(sanitizeSource({ kind: 'xtream', server: 'http://tv.example:8080', username: 'u', password: 'p', format: 'x' }))
-      .toEqual({ kind: 'xtream', server: 'http://tv.example:8080', username: 'u', password: 'p', format: 'ts' });
+    expect(
+      sanitizeSource({
+        kind: 'xtream',
+        server: 'http://tv.example:8080',
+        username: 'u',
+        password: 'p',
+        format: 'x',
+      }),
+    ).toEqual({
+      kind: 'xtream',
+      server: 'http://tv.example:8080',
+      username: 'u',
+      password: 'p',
+      format: 'ts',
+    });
     const l = sanitizeLineup({
       channels: [
         { key: 'a', name: 'A', url: 'https://x.example/a.m3u8', logo: 'data:text/html,hi' },
@@ -52,7 +71,12 @@ describe('share links', () => {
 
   it('cleans board definitions', () => {
     const boards = sanitizeBoards([
-      { id: 'My Board!', name: 'Mine', rows: 99, widgets: [{ type: 'radar', w: 40, h: 0, source: 'nope' }, { type: 'bogus' }] },
+      {
+        id: 'My Board!',
+        name: 'Mine',
+        rows: 99,
+        widgets: [{ type: 'radar', w: 40, h: 0, source: 'nope' }, { type: 'bogus' }],
+      },
     ]);
     expect(boards).toHaveLength(1);
     expect(boards![0].id).toBe('my-board');
