@@ -47,8 +47,13 @@ jobs:
         if: steps.release.outputs.release_created != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # the PR release-please just created or updated; the label search can lag behind a new PR
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
         run: |
-          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --label 'autorelease: pending' --json number --jq '.[0].number // empty')
+          pr=$(jq -r '.number // empty' <<< "${RELEASE_PR:-null}")
+          if [ -z "$pr" ]; then
+            pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --label 'autorelease: pending' --json number --jq '.[0].number // empty')
+          fi
           if [ -n "$pr" ]; then gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash; fi
 
   publish:
