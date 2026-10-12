@@ -75,7 +75,7 @@ export class IndexedDbBackend implements StorageBackend {
     return old;
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
+  async set(key: string, value: unknown): Promise<void> {
     if (!(await this.write((s) => s.put(value, key)))) {
       await this.legacy.set(key, value);
     }

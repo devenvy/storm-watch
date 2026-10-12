@@ -9,7 +9,7 @@ class MemoryBackend implements StorageBackend {
   async get<T>(key: string) {
     return this.data.get(key) as T | undefined;
   }
-  async set<T>(key: string, value: T) {
+  async set(key: string, value: unknown) {
     this.data.set(key, value);
   }
   async remove(key: string) {

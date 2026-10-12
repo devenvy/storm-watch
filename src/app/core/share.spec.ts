@@ -23,7 +23,7 @@ describe('share links', () => {
   });
 
   it('rejects unknown formats and oversize input', async () => {
-    await expect(decodePayload('xabc')).rejects.toThrow();
+    await expect(decodePayload('xabc')).rejects.toThrow('Unrecognized share link.');
     await expect(decodePayload(`j${'a'.repeat(70_000)}`)).rejects.toThrow(/too large/);
   });
 

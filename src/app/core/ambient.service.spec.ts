@@ -43,7 +43,7 @@ describe('parseStations', () => {
   });
 
   it('rejects an unexpected body', () => {
-    expect(() => parseStations({ error: 'x' }, 0, 0)).toThrow();
+    expect(() => parseStations({ error: 'x' }, 0, 0)).toThrow('Unexpected Ambient response');
   });
 
   it('measures miles', () => {

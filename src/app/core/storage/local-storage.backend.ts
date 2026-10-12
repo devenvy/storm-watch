@@ -13,7 +13,7 @@ export class LocalStorageBackend implements StorageBackend {
     }
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
+  async set(key: string, value: unknown): Promise<void> {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {

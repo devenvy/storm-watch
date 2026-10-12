@@ -42,7 +42,7 @@ export class Persist {
     return s;
   }
 
-  private save<T>(key: string, value: T): void {
+  private save(key: string, value: unknown): void {
     const op =
       value === null || value === undefined
         ? this.backend.remove(key)

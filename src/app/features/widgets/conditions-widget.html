@@ -17,7 +17,7 @@
 <div class="scroll">
   @if (alerts.station(); as s) {
     <p class="src muted">
-      Home station{{ s.place ? ' in ' + s.place : '' }}, {{ s.distanceMi | number: '1.0-1' }} mi
+      Home station{{ s.place ? ` in ${s.place}` : '' }}, {{ s.distanceMi | number: '1.0-1' }} mi
       away
       @if (settings.pws() === s.id) {
         · pinned
@@ -123,7 +123,7 @@
       <ul>
         @for (s of alerts.stations(); track s.id) {
           <li [class.current]="s.id === alerts.station()?.id">
-            <button type="button" [title]="'Use ' + s.name" (click)="pin(s.id)">
+            <button type="button" [title]="`Use ${s.name}`" (click)="pin(s.id)">
               <span class="nm">{{ s.name }}</span>
               <span class="muted">{{ s.distanceMi | number: '1.0-1' }} mi</span>
               <span>{{ s.tempF }}°</span>

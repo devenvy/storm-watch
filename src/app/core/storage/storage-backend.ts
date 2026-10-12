@@ -10,7 +10,7 @@ import { IndexedDbBackend } from './indexeddb.backend';
 export interface StorageBackend {
   readonly name: string;
   get: <T>(key: string) => Promise<T | undefined>;
-  set: <T>(key: string, value: T) => Promise<void>;
+  set: (key: string, value: unknown) => Promise<void>;
   remove: (key: string) => Promise<void>;
 }
 

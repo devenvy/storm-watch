@@ -67,7 +67,7 @@ export interface WarningShape {
 }
 
 /** Events that mean "act now" for the alerted location. */
-export const DANGER_EVENTS =
+const DANGER_EVENTS =
   /Tornado Warning|Tornado Emergency|Flash Flood Emergency|Extreme Wind Warning|Hurricane Warning|Storm Surge Warning/;
 
 /**
@@ -96,7 +96,7 @@ export function dangerLabel(a: Pick<NwsAlert, 'event' | 'parameters'>): string {
   return a.event;
 }
 
-export const POLYGON_EVENTS = [
+const POLYGON_EVENTS = [
   'Tornado Warning',
   'Severe Thunderstorm Warning',
   'Flash Flood Warning',

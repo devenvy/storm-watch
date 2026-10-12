@@ -37,7 +37,7 @@ export interface Board {
   widgets: Widget[];
 }
 
-export const GRID_COLS = 12;
+const GRID_COLS = 12;
 export const MAX_ROWS = 12;
 
 /** Limits applied to untrusted board data. */

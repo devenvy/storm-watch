@@ -5,7 +5,7 @@ import { FETCH_TIMEOUT_MS } from './nws.service';
 const IEM = 'https://mesonet.agron.iastate.edu';
 const IEM_TILES = `${IEM}/cache/tile.py/1.0.0`;
 
-export type FrameKind = 'past' | 'forecast';
+type FrameKind = 'past' | 'forecast';
 
 export interface RadarFrame {
   time: Date;
