@@ -1,0 +1,27 @@
+name: CI
+
+# Shared DevEnvy CI (guidelines check, lint, format, typecheck, tests with coverage, build, audit).
+# Pull requests and the weekly audit run it here; pages.yml and release.yml run it as their gate.
+# Required status check: "ci / result".
+on:
+  pull_request:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: devenvy/code-guidelines-ecma/.github/workflows/consumer-ci.yml@main
+    permissions:
+      contents: read
+      pull-requests: write # coverage summary comment
+    with:
+      coverage-directory: coverage/stormwatch

@@ -13,30 +13,30 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Each check is its own workflow so it passes or fails on its own; all must pass before publishing.
-  lint:
-    uses: ./.github/workflows/lint.yml
-  test:
-    uses: ./.github/workflows/test.yml
-  audit:
-    uses: ./.github/workflows/audit.yml
+  # Shared CI and the container smoke test must both pass before publishing.
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      pull-requests: write
   docker:
     uses: ./.github/workflows/docker.yml
 
   build:
-    needs: [lint, test, audit, docker]
+    needs: [ci, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run build
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
