@@ -1,6 +1,7 @@
 import { computed, inject, Injectable } from '@angular/core';
+
+import { RADAR_SOURCES, type RadarSourceId } from './radar-sources';
 import { Persist } from './storage/persist';
-import { RADAR_SOURCES, RadarSourceId } from './radar-sources';
 
 export type WidgetType = 'radar' | 'player' | 'alerts' | 'conditions' | 'tropical' | 'channels' | 'links';
 
@@ -72,13 +73,13 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 
 /** Validates untrusted board data (storage, share links) and drops anything malformed. */
 export function sanitizeBoards(input: unknown): Board[] | null {
-  if (!Array.isArray(input)) return null;
+  if (!Array.isArray(input)) {return null;}
   const ids = new Set<string>();
   const boards: Board[] = [];
   for (const b of input.slice(0, 20)) {
-    if (!b || typeof b !== 'object' || !Array.isArray(b.widgets)) continue;
+    if (!b || typeof b !== 'object' || !Array.isArray(b.widgets)) {continue;}
     let id = slug(String(b.id ?? b.name ?? 'board'));
-    while (ids.has(id)) id += '-2';
+    while (ids.has(id)) {id += '-2';}
     ids.add(id);
     const rows = clamp(Number(b.rows) || 6, 1, MAX_ROWS);
     boards.push({
@@ -87,7 +88,7 @@ export function sanitizeBoards(input: unknown): Board[] | null {
       rows,
       widgets: (b.widgets as unknown[]).slice(0, 30).flatMap(x => {
         const v = x as Partial<Widget>;
-        if (!v || !isType(v.type)) return [];
+        if (!v || !isType(v.type)) {return [];}
         return [{
           id: uid(),
           type: v.type,
@@ -126,7 +127,7 @@ export class BoardsStore {
   addBoard(name: string, copyOf?: Board): Board {
     let id = slug(name);
     const taken = new Set(this.boards().map(b => b.id));
-    for (let i = 2; taken.has(id); i++) id = `${slug(name)}-${i}`;
+    for (let i = 2; taken.has(id); i++) {id = `${slug(name)}-${i}`;}
     const board: Board = copyOf
       ? { ...copyOf, id, name, widgets: copyOf.widgets.map(x => ({ ...x, id: uid() })) }
       : { id, name, rows: 6, widgets: [w('radar', 8, 6, { source: 'blend' }), w('alerts', 4, 6)] };
@@ -151,7 +152,7 @@ export class BoardsStore {
       const list = [...all];
       const i = list.findIndex(b => b.id === id);
       const j = i + delta;
-      if (i < 0 || j < 0 || j >= list.length) return all;
+      if (i < 0 || j < 0 || j >= list.length) {return all;}
       [list[i], list[j]] = [list[j], list[i]];
       return list;
     });
@@ -176,7 +177,7 @@ export class BoardsStore {
     this.updateBoard(boardId, b => {
       const list = [...b.widgets];
       const [item] = list.splice(from, 1);
-      if (!item) return b;
+      if (!item) {return b;}
       list.splice(clamp(to, 0, list.length), 0, item);
       return { ...b, widgets: list };
     });
@@ -195,8 +196,8 @@ export class BoardsStore {
   setChannel(boardId: string, widgetId: string, channel: string | null): void {
     this.updateWidget(boardId, widgetId, x => {
       const next = { ...x };
-      if (channel) next.channel = channel;
-      else delete next.channel;
+      if (channel) {next.channel = channel;}
+      else {delete next.channel;}
       return next;
     });
   }

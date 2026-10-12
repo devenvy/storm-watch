@@ -3,10 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, input, linkedSignal } fro
 /** Fixed-size channel logo; falls back to initials when missing or broken. */
 @Component({
   selector: 'sw-logo',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (src() && !failed()) {
-      <img [src]="src()" alt="" loading="lazy" (error)="failed.set(true)">
+      <img alt="" loading="lazy" [src]="src()" (error)="failed.set(true)">
     } @else {
       <span aria-hidden="true">{{ initials() }}</span>
     }
@@ -17,6 +16,7 @@ import { ChangeDetectionStrategy, Component, computed, input, linkedSignal } fro
     span { width: 100%; height: 100%; display: grid; place-items: center; background: #21262d; color: var(--muted);
       font-size: 11px; font-weight: 700; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ChannelLogo {
   readonly src = input<string | undefined>();

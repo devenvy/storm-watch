@@ -1,17 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { LineupStore } from '../iptv/lineup.store';
-import { NowPlaying, xtreamNowPlaying } from '../iptv/sources';
-import { Player, PlayerStatus } from '../shared/player';
+
 import { AlertsStore } from '../core/alerts.store';
+import { LineupStore } from '../iptv/lineup.store';
+import { type NowPlaying, xtreamNowPlaying } from '../iptv/sources';
 import { ChannelLogo } from '../shared/channel-logo';
+import { Player, type PlayerStatus } from '../shared/player';
 
 /** Full-screen-friendly player with lineup flipping (arrows, number keys, remote d-pad). */
 @Component({
   selector: 'sw-watch',
-  host: { '(window:keydown)': 'onKey($event)' },
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Player, RouterLink, DatePipe, ChannelLogo],
   template: `
     <div class="layout">
@@ -27,10 +26,10 @@ import { ChannelLogo } from '../shared/channel-logo';
         }
       </div>
       <nav class="list">
-        @for (c of lineup.channels(); track c.key; let i = $index) {
-          <a [routerLink]="['/watch', c.key]" [class.active]="c.key === key()" replaceUrl queryParamsHandling="preserve">
+        @for (c of lineup.channels(); track c.key) {
+          <a replaceUrl queryParamsHandling="preserve" [routerLink]="['/watch', c.key]" [class.active]="c.key === key()">
             <sw-logo [src]="c.logo" [name]="c.name" />
-            <span><small>{{ i + 1 }}</small> {{ c.name }}</span>
+            <span><small>{{ $index + 1 }}</small> {{ c.name }}</span>
           </a>
         } @empty {
           <p class="muted">Lineup is empty. <a routerLink="/setup" fragment="iptv">Set up IPTV</a>.</p>
@@ -60,6 +59,8 @@ import { ChannelLogo } from '../shared/channel-logo';
     .list small { color: var(--muted); }
     .hint { color: var(--muted); font-size: 12px; margin-top: auto; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(window:keydown)': 'onKey($event)' }
 })
 export class Watch {
   /** Route param, bound via withComponentInputBinding. */
@@ -98,16 +99,16 @@ export class Watch {
   }
 
   protected onKey(e: KeyboardEvent): void {
-    if ((e.target as HTMLElement)?.tagName === 'INPUT') return;
+    if ((e.target as HTMLElement)?.tagName === 'INPUT') {return;}
     const cur = this.channel();
-    if (!cur) return;
+    if (!cur) {return;}
     let next = null;
-    if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'ChannelUp') next = this.lineup.neighbor(cur.key, -1);
-    else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'ChannelDown') next = this.lineup.neighbor(cur.key, 1);
-    else if (/^[1-9]$/.test(e.key)) next = this.lineup.channels()[+e.key - 1] ?? null;
+    if (e.key === 'ArrowUp' || e.key === 'PageUp' || e.key === 'ChannelUp') {next = this.lineup.neighbor(cur.key, -1);}
+    else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === 'ChannelDown') {next = this.lineup.neighbor(cur.key, 1);}
+    else if (/^[1-9]$/.test(e.key)) {next = this.lineup.channels()[+e.key - 1] ?? null;}
     else if (e.key === 'f' || e.key === 'F') {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else document.querySelector('sw-player video')?.requestFullscreen();
+      if (document.fullscreenElement) {document.exitFullscreen();}
+      else {document.querySelector('sw-player video')?.requestFullscreen();}
       return;
     }
     if (next) {

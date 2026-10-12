@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
-import type { Geometry } from 'geojson';
+
 import { miles } from '../shared/format';
+
+import type { Geometry } from 'geojson';
 
 const NWS = 'https://api.weather.gov';
 const HEADERS = { Accept: 'application/geo+json' };
@@ -62,7 +64,7 @@ export const DANGER_EVENTS =
  * CATASTROPHIC damage threat, so the event name alone is not enough.
  */
 export function isDanger(a: Pick<NwsAlert, 'event' | 'parameters'>): boolean {
-  if (DANGER_EVENTS.test(a.event)) return true;
+  if (DANGER_EVENTS.test(a.event)) {return true;}
   const p = a.parameters ?? {};
   return [p['flashFloodDamageThreat'], p['tornadoDamageThreat']].some(v => v?.includes('CATASTROPHIC'));
 }
@@ -70,8 +72,8 @@ export function isDanger(a: Pick<NwsAlert, 'event' | 'parameters'>): boolean {
 /** Display name, upgrading CATASTROPHIC warnings to their "Emergency" name. */
 export function dangerLabel(a: Pick<NwsAlert, 'event' | 'parameters'>): string {
   const p = a.parameters ?? {};
-  if (p['tornadoDamageThreat']?.includes('CATASTROPHIC')) return 'Tornado Emergency';
-  if (p['flashFloodDamageThreat']?.includes('CATASTROPHIC')) return 'Flash Flood Emergency';
+  if (p['tornadoDamageThreat']?.includes('CATASTROPHIC')) {return 'Tornado Emergency';}
+  if (p['flashFloodDamageThreat']?.includes('CATASTROPHIC')) {return 'Flash Flood Emergency';}
   return a.event;
 }
 
@@ -105,7 +107,7 @@ interface ObservationResponse {
 export class NwsService {
   private async get<T>(url: string): Promise<T> {
     const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!r.ok) throw new Error(`NWS ${r.status} for ${url}`);
+    if (!r.ok) {throw new Error(`NWS ${r.status} for ${url}`);}
     return r.json() as Promise<T>;
   }
 
@@ -157,7 +159,7 @@ export class NwsService {
       const age = Date.now() - Date.parse(obs.properties.timestamp);
       if (age < OBS_STALE_MS && obs.properties.temperature?.value != null) { found = { s, obs }; break; }
     }
-    if (!found) throw new Error('No NWS station near this location is reporting');
+    if (!found) {throw new Error('No NWS station near this location is reporting');}
     const { s: first, obs: d } = found;
     const p = d.properties;
     const cToF = (v: number | null | undefined) => (v == null ? null : Math.round((v * 9) / 5 + 32));

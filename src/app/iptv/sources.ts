@@ -1,4 +1,4 @@
-import { Channel, M3uSource, XtreamSource } from './models';
+import type { Channel, M3uSource, XtreamSource } from './models';
 
 export class SourceError extends Error {}
 
@@ -19,7 +19,7 @@ export async function diagnosedFetch(url: string): Promise<Response> {
       await fetch(url, { mode: 'no-cors' });
       throw new SourceError('Provider is reachable but does not allow browser access (no CORS header).');
     } catch (e) {
-      if (e instanceof SourceError) throw e;
+      if (e instanceof SourceError) {throw e;}
       throw new SourceError('Provider unreachable (offline, DNS, blocked port, or wrong URL).');
     }
   }
@@ -31,7 +31,7 @@ function base(s: XtreamSource): string {
 
 function apiUrl(s: XtreamSource, action?: string, extra = ''): string {
   const q = `username=${encodeURIComponent(s.username)}&password=${encodeURIComponent(s.password)}`;
-  return `${base(s)}/player_api.php?${q}${action ? '&action=' + action : ''}${extra}`;
+  return `${base(s)}/player_api.php?${q}${action ? `&action=${  action}` : ''}${extra}`;
 }
 
 export interface XtreamAccount {
@@ -44,10 +44,10 @@ export interface XtreamAccount {
 
 export async function xtreamLogin(s: XtreamSource): Promise<XtreamAccount> {
   const r = await diagnosedFetch(apiUrl(s));
-  if (!r.ok) throw new SourceError(`Login failed: HTTP ${r.status}`);
+  if (!r.ok) {throw new SourceError(`Login failed: HTTP ${r.status}`);}
   const d = await r.json();
   const u = d.user_info;
-  if (!u || u.auth === 0) throw new SourceError('Login rejected: check username and password.');
+  if (!u || u.auth === 0) {throw new SourceError('Login rejected: check username and password.');}
   return {
     status: u.status,
     maxConnections: +u.max_connections,
@@ -64,8 +64,8 @@ interface XtreamStream {
 
 export async function xtreamChannels(s: XtreamSource): Promise<Channel[]> {
   const [cats, streams] = await Promise.all([
-    diagnosedFetch(apiUrl(s, 'get_live_categories')).then(r => r.json() as Promise<XtreamCategory[]>),
-    diagnosedFetch(apiUrl(s, 'get_live_streams')).then(r => r.json() as Promise<XtreamStream[]>),
+    diagnosedFetch(apiUrl(s, 'get_live_categories')).then(async r => r.json() as Promise<XtreamCategory[]>),
+    diagnosedFetch(apiUrl(s, 'get_live_streams')).then(async r => r.json() as Promise<XtreamStream[]>),
   ]);
   const catName = new Map<string, string>(cats.map(c => [String(c.category_id), c.category_name]));
   const user = encodeURIComponent(s.username);
@@ -100,7 +100,7 @@ export async function xtreamNowPlaying(s: XtreamSource, streamId: number): Promi
   const r = await fetch(apiUrl(s, 'get_short_epg', `&stream_id=${streamId}&limit=1`));
   const d = await r.json();
   const e = d.epg_listings?.[0];
-  if (!e) return null;
+  if (!e) {return null;}
   return {
     title: b64utf8(e.title ?? ''),
     description: b64utf8(e.description ?? ''),
@@ -111,7 +111,7 @@ export async function xtreamNowPlaying(s: XtreamSource, streamId: number): Promi
 
 export async function m3uChannels(s: M3uSource): Promise<Channel[]> {
   const r = await diagnosedFetch(s.url.trim());
-  if (!r.ok) throw new SourceError(`Playlist failed: HTTP ${r.status}`);
+  if (!r.ok) {throw new SourceError(`Playlist failed: HTTP ${r.status}`);}
   return parseM3u(await r.text());
 }
 
@@ -120,15 +120,15 @@ export function parseM3u(text: string): Channel[] {
   const lines = text.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const info = lines[i];
-    if (!info.startsWith('#EXTINF')) continue;
+    if (!info.startsWith('#EXTINF')) {continue;}
     let j = i + 1;
-    while (j < lines.length && (!lines[j].trim() || lines[j].startsWith('#'))) j++;
+    while (j < lines.length && (!lines[j].trim() || lines[j].startsWith('#'))) {j++;}
     const url = lines[j]?.trim();
-    if (!url) continue;
+    if (!url) {continue;}
     const attr = (name: string) => info.match(new RegExp(`${name}="([^"]*)"`))?.[1] || undefined;
     const comma = info.indexOf(',', info.lastIndexOf('"') + 1);
     out.push({
-      key: 'm' + hash(url),
+      key: `m${  hash(url)}`,
       name: (comma >= 0 ? info.slice(comma + 1) : attr('tvg-name') ?? url).trim(),
       url,
       logo: attr('tvg-logo'),
@@ -142,6 +142,6 @@ export function parseM3u(text: string): Channel[] {
 
 function hash(s: string): string {
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  for (let i = 0; i < s.length; i++) {h = Math.imul(h ^ s.charCodeAt(i), 16777619);}
   return (h >>> 0).toString(36);
 }

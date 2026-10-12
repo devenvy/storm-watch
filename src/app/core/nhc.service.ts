@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+
 import { FETCH_TIMEOUT_MS } from './nws.service';
 
 /**
@@ -41,18 +42,18 @@ const known = (n: number) => (n === 9999 ? null : n);
 @Injectable({ providedIn: 'root' })
 export class NhcService {
   async activeStorms(): Promise<Storm[]> {
-    const results = await Promise.all(BINS.map((bin, i) => this.current(bin, pointsLayer(i))));
-    return results.filter((s): s is Storm => !!s);
+    const results = await Promise.all(BINS.map(async (bin, i) => this.current(bin, pointsLayer(i))));
+    return results.filter((s): s is Storm => Boolean(s));
   }
 
   private async current(bin: string, layer: number): Promise<Storm | null> {
     const q = `${MAPSERVER}/${layer}/query?where=tau%3D0&outFields=*&returnGeometry=false&f=json`;
     const r = await fetch(q, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!r.ok) throw new Error(`NHC ${r.status}`);
+    if (!r.ok) {throw new Error(`NHC ${r.status}`);}
     const d = await r.json();
-    if (d.error) throw new Error(`NHC: ${d.error.message}`);
+    if (d.error) {throw new Error(`NHC: ${d.error.message}`);}
     const a = d.features?.[0]?.attributes;
-    if (!a) return null;
+    if (!a) {return null;}
     const id = String(a.idp_source ?? '').split('-')[0].toUpperCase();
     const speedKt = known(a.tcspd);
     return {

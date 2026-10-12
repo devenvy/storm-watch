@@ -1,9 +1,10 @@
 import { scoreChannel, suggest } from './scoring';
 import { parseM3u } from './sources';
-import { Channel } from './models';
+
+import type { Channel } from './models';
 
 const ctx = { city: 'Dothan', state: 'AL', country: 'US' };
-const ch = (name: string, category?: string): Channel => ({ key: name, name, url: 'http://x/' + name, category });
+const ch = (name: string, category?: string): Channel => ({ key: name, name, url: `http://x/${  name}`, category });
 
 describe('scoreChannel', () => {
   it('ranks a local affiliate in the user city highest', () => {

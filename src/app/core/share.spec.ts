@@ -1,6 +1,6 @@
-import { decodePayload, encodePayload, SharePayload } from './share';
-import { sanitizeLocation } from './settings.store';
 import { sanitizeBoards } from './boards.store';
+import { sanitizeLocation } from './settings.store';
+import { decodePayload, encodePayload, type SharePayload } from './share';
 import { sanitizeLineup, sanitizeSource } from '../iptv/validate';
 
 const loc = {
@@ -18,7 +18,7 @@ describe('share links', () => {
 
   it('rejects unknown formats and oversize input', async () => {
     await expect(decodePayload('xabc')).rejects.toThrow();
-    await expect(decodePayload('j' + 'a'.repeat(70_000))).rejects.toThrow(/too large/);
+    await expect(decodePayload(`j${  'a'.repeat(70_000)}`)).rejects.toThrow(/too large/);
   });
 
   it('stops decompressing a zip bomb at the size limit', async () => {

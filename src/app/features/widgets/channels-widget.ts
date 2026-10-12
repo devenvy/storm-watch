@@ -1,24 +1,22 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
 import { LineupStore } from '../../iptv/lineup.store';
 import { ChannelLogo } from '../../shared/channel-logo';
 import { CardButtons, Expandable } from '../../shared/expandable';
 
 @Component({
   selector: 'sw-channels-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, ChannelLogo, CardButtons],
-  hostDirectives: [Expandable],
-  host: { class: 'panel widget' },
   template: `
     <h2><span class="title">Channels</span> <a routerLink="/setup" fragment="lineup" class="meta">edit</a>
       <sw-card-buttons [card]="card" /></h2>
     <div class="scroll tiles">
-      @for (c of lineup.channels(); track c.key; let i = $index) {
-        <a class="tile" [routerLink]="[]" [queryParams]="{ ch: c.key }" queryParamsHandling="merge" replaceUrl
+      @for (c of lineup.channels(); track c.key) {
+        <a class="tile" queryParamsHandling="merge" replaceUrl [routerLink]="[]" [queryParams]="{ ch: c.key }"
           [class.on]="c.key === ch()">
           <sw-logo [src]="c.logo" [name]="c.name" />
-          <span><small>{{ i + 1 }}</small> {{ c.name }}</span>
+          <span><small>{{ $index + 1 }}</small> {{ c.name }}</span>
         </a>
       } @empty {
         <p class="muted"><a routerLink="/setup" fragment="iptv">Add an IPTV source</a> to build a lineup.</p>
@@ -35,6 +33,9 @@ import { CardButtons, Expandable } from '../../shared/expandable';
     .tile small { color: var(--muted); }
     :host(.card-expanded) .tiles { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' },
+  hostDirectives: [Expandable]
 })
 export class ChannelsWidget {
   protected readonly lineup = inject(LineupStore);

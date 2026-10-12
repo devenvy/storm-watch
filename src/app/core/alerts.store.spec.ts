@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+
 import { AlertsStore } from './alerts.store';
-import { dangerLabel, isDanger, NwsAlert, NwsService } from './nws.service';
-import { NhcService } from './nhc.service';
 import { AmbientService } from './ambient.service';
-import { HomeLocation, SettingsStore } from './settings.store';
-import { STORAGE_BACKEND, StorageBackend } from './storage/storage-backend';
+import { NhcService } from './nhc.service';
+import { dangerLabel, isDanger, type NwsAlert, NwsService } from './nws.service';
+import { type HomeLocation, SettingsStore } from './settings.store';
+import { STORAGE_BACKEND, type StorageBackend } from './storage/storage-backend';
 
 class MemoryBackend implements StorageBackend {
   readonly name = 'memory';
@@ -40,9 +41,9 @@ describe('AlertsStore', () => {
   it('drops responses that arrive after the location changed', async () => {
     const pending = new Map<number, (a: NwsAlert[]) => void>();
     const nws = {
-      alertsAt: (lat: number) => new Promise<NwsAlert[]>(r => pending.set(lat, r)),
+      alertsAt: async (lat: number) => new Promise<NwsAlert[]>(r => pending.set(lat, r)),
       warningShapes: async () => [],
-      latestObservation: () => new Promise(() => undefined),
+      latestObservation: async () => new Promise(() => undefined),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -81,7 +82,7 @@ describe('AlertsStore', () => {
       providers: [
         provideRouter([]),
         { provide: STORAGE_BACKEND, useValue: new MemoryBackend() },
-        { provide: NwsService, useValue: { alertsAt: async () => { alertCalls++; return []; }, warningShapes: async () => [], latestObservation: () => new Promise(() => undefined) } },
+        { provide: NwsService, useValue: { alertsAt: async () => { alertCalls++; return []; }, warningShapes: async () => [], latestObservation: async () => new Promise(() => undefined) } },
         { provide: NhcService, useValue: { activeStorms: async () => [] } },
         { provide: AmbientService, useValue: { nearby: async () => [] } },
       ],

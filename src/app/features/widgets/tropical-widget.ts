@@ -1,20 +1,18 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+
 import { AlertsStore } from '../../core/alerts.store';
 import { CardButtons, Expandable } from '../../shared/expandable';
 import { compass, ktToMph } from '../../shared/format';
 
 @Component({
   selector: 'sw-tropical-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CardButtons, DatePipe],
-  hostDirectives: [Expandable],
-  host: { class: 'panel widget' },
   template: `
     <h2><span class="title">Tropical · {{ alerts.storms().length }}</span><sw-card-buttons [card]="card" /></h2>
     <div class="scroll list">
       @for (s of alerts.storms(); track s.id) {
-        <a class="storm" [href]="s.advisoryUrl" target="_blank" rel="noopener" title="Open NHC advisory">
+        <a class="storm" target="_blank" rel="noopener" title="Open NHC advisory" [href]="s.advisoryUrl">
           <img [src]="s.coneImage" [alt]="s.name + ' forecast cone'">
           <span>
             <b>{{ s.name }}</b>
@@ -48,6 +46,9 @@ import { compass, ktToMph } from '../../shared/format';
     :host(.card-expanded) .storm { flex-direction: column; align-items: stretch; flex: 1; min-height: 0; }
     :host(.card-expanded) .storm img { width: 100%; height: auto; flex: 1; min-height: 0; object-fit: contain; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' },
+  hostDirectives: [Expandable]
 })
 export class TropicalWidget {
   protected readonly alerts = inject(AlertsStore);

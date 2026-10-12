@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
 import { LineupStore } from '../../iptv/lineup.store';
 import { CardButtons, Expandable } from '../../shared/expandable';
-import { Player, PlayerStatus } from '../../shared/player';
+import { Player, type PlayerStatus } from '../../shared/player';
 
 export function statusText(s: PlayerStatus): string {
   switch (s.state) {
@@ -17,21 +18,18 @@ export function statusText(s: PlayerStatus): string {
 /** Plays the widget's pinned channel, or else the channel picked on the board (?ch=). */
 @Component({
   selector: 'sw-player-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Player, RouterLink, CardButtons],
-  hostDirectives: [Expandable],
-  host: { class: 'panel widget' },
   template: `
     <h2>
       <span class="title">@if (playing(); as c) { {{ c.name }} } @else { Live TV }</span>
       <span class="meta pstat" [class]="status().state">{{ text() }}</span>
       @if (playing(); as c) {
-        <button class="meta icon" (click)="muted.set(!muted())" [title]="muted() ? 'Unmute' : 'Mute'"
-          [attr.aria-label]="muted() ? 'Unmute' : 'Mute'">{{ muted() ? '🔇' : '🔊' }}</button>
-        <a class="meta icon" [routerLink]="['/watch', c.key]" queryParamsHandling="preserve" title="Open Watch page" aria-label="Open Watch page">↗</a>
+        <button class="meta icon" [title]="muted() ? 'Unmute' : 'Mute'" [attr.aria-label]="muted() ? 'Unmute' : 'Mute'"
+          (click)="muted.set(!muted())">{{ muted() ? '🔇' : '🔊' }}</button>
+        <a class="meta icon" queryParamsHandling="preserve" title="Open Watch page" aria-label="Open Watch page" [routerLink]="['/watch', c.key]">↗</a>
         @if (!pinned()) {
-          <a class="meta icon" [routerLink]="[]" [queryParams]="{ ch: null }" queryParamsHandling="merge"
-            title="Stop" aria-label="Stop">■</a>
+          <a class="meta icon" queryParamsHandling="merge" title="Stop" aria-label="Stop"
+            [routerLink]="[]" [queryParams]="{ ch: null }">■</a>
         }
       }
       <sw-card-buttons [card]="card" />
@@ -54,6 +52,9 @@ export function statusText(s: PlayerStatus): string {
     .pstat.reconnecting { color: var(--yellow); }
     .icon { text-decoration: none; font-size: 14px; padding: 0 4px; background: none; border: 0; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' },
+  hostDirectives: [Expandable]
 })
 export class PlayerWidget {
   protected readonly lineup = inject(LineupStore);

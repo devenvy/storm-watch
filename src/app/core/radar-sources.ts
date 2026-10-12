@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+
 import { FETCH_TIMEOUT_MS } from './nws.service';
 
 const IEM = 'https://mesonet.agron.iastate.edu';
@@ -56,7 +57,7 @@ function ymdhm(d: Date): string {
 
 async function json<T>(url: string): Promise<T> {
   const r = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-  if (!r.ok) throw new Error(`${r.status} ${url}`);
+  if (!r.ok) {throw new Error(`${r.status} ${url}`);}
   return r.json() as Promise<T>;
 }
 
@@ -101,7 +102,7 @@ export class RadarSources {
     const frames: RadarFrame[] = [];
     for (let m = 0; m <= 18 * 60; m += 15) {
       const t = init.getTime() + m * MIN;
-      if (t <= from || t > end) continue;
+      if (t <= from || t > end) {continue;}
       frames.push({
         time: new Date(t),
         url: `${IEM_TILES}/hrrr::REFD-F${String(m).padStart(4, '0')}-0/{z}/{x}/{y}.png?_=${init.getTime()}`,
@@ -128,13 +129,13 @@ export class RadarSources {
     const id = station.length === 4 ? station.slice(1) : station;
     const end = new Date();
     const start = new Date(end.getTime() - 60 * MIN);
-    const iso = (d: Date) => d.toISOString().slice(0, 17) + '00Z';
+    const iso = (d: Date) => `${d.toISOString().slice(0, 17)  }00Z`;
     const d = await json<ScanList>(`${IEM}/json/radar.py?operation=list&radar=${id}&product=${product}&start=${iso(start)}&end=${iso(end)}`);
     const frames = d.scans.map(s => {
       const t = new Date(s.ts);
       return { time: t, url: `${IEM_TILES}/ridge::${id}-${product}-${ymdhm(t)}/{z}/{x}/{y}.png`, kind: 'past' as const };
     });
-    if (!frames.length) throw new Error(`No recent ${product} scans from ${station}`);
+    if (!frames.length) {throw new Error(`No recent ${product} scans from ${station}`);}
     return {
       frames,
       startIndex: frames.length - 1,

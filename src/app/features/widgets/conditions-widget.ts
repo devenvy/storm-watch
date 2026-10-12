@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+
 import { AlertsStore } from '../../core/alerts.store';
 import { SettingsStore } from '../../core/settings.store';
 import { CardButtons, Expandable } from '../../shared/expandable';
@@ -11,10 +12,7 @@ import { compass } from '../../shared/format';
  */
 @Component({
   selector: 'sw-conditions-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, DecimalPipe, CardButtons],
-  hostDirectives: [Expandable],
-  host: { class: 'panel widget' },
   template: `
     <h2><span class="title">Now @if (alerts.station(); as s) { · {{ s.name }} } @else if (alerts.observation(); as o) { · {{ o.stationName }} }</span>
       @if (alerts.station(); as s) { <span class="meta">{{ s.at | date: 'shortTime' }}</span> }
@@ -64,7 +62,7 @@ import { compass } from '../../shared/format';
           <ul>
             @for (s of alerts.stations(); track s.id) {
               <li [class.current]="s.id === alerts.station()?.id">
-                <button type="button" (click)="pin(s.id)" [title]="'Use ' + s.name">
+                <button type="button" [title]="'Use ' + s.name" (click)="pin(s.id)">
                   <span class="nm">{{ s.name }}</span>
                   <span class="muted">{{ s.distanceMi | number: '1.0-1' }} mi</span>
                   <span>{{ s.tempF }}°</span>
@@ -102,6 +100,9 @@ import { compass } from '../../shared/format';
     :host(.card-expanded) .stats b { font-size: 40px; }
     :host(.card-expanded) .stats small { font-size: 14px; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' },
+  hostDirectives: [Expandable]
 })
 export class ConditionsWidget {
   protected readonly alerts = inject(AlertsStore);

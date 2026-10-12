@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+
 import { Persist } from './persist';
-import { STORAGE_BACKEND, StorageBackend } from './storage-backend';
+import { STORAGE_BACKEND, type StorageBackend } from './storage-backend';
 
 class MemoryBackend implements StorageBackend {
   readonly name = 'memory';

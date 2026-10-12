@@ -1,8 +1,10 @@
 import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
-import { Persist } from '../core/storage/persist';
-import { Channel, Lineup, Source } from './models';
+
 import { m3uChannels, xtreamChannels } from './sources';
 import { sanitizeLineup, sanitizeSource } from './validate';
+import { Persist } from '../core/storage/persist';
+
+import type { Channel, Lineup, Source } from './models';
 
 /**
  * The saved source and the user's "storm lineup": a small, pre-curated channel list
@@ -31,7 +33,7 @@ export class LineupStore {
     effect(() => {
       const src = this.source();
       untracked(() => {
-        if (src === this.catalogFor) return;
+        if (src === this.catalogFor) {return;}
         this.catalogFor = null;
         this.catalogSeq++;
         this.catalog.set([]);
@@ -50,7 +52,7 @@ export class LineupStore {
 
   async loadCatalog(): Promise<void> {
     const src = this.source();
-    if (!src) return;
+    if (!src) {return;}
     const seq = ++this.catalogSeq;
     this.catalogFor = src;
     this.catalogLoading.set(true);
@@ -58,13 +60,13 @@ export class LineupStore {
     try {
       const catalog = src.kind === 'xtream' ? await xtreamChannels(src) : await m3uChannels(src);
       // A newer load (or a source change) superseded this one.
-      if (seq !== this.catalogSeq || this.source() !== src) return;
+      if (seq !== this.catalogSeq || this.source() !== src) {return;}
       this.catalog.set(catalog);
       this.refreshLineup(catalog);
     } catch (e) {
-      if (seq === this.catalogSeq) this.catalogError.set((e as Error).message);
+      if (seq === this.catalogSeq) {this.catalogError.set((e as Error).message);}
     } finally {
-      if (seq === this.catalogSeq) this.catalogLoading.set(false);
+      if (seq === this.catalogSeq) {this.catalogLoading.set(false);}
     }
   }
 
@@ -79,7 +81,7 @@ export class LineupStore {
       let changed = false;
       const channels = l.channels.map(c => {
         const fresh = byKey.get(c.key);
-        if (!fresh || (fresh.url === c.url && fresh.logo === c.logo) || origin(fresh.url) !== origin(c.url)) return c;
+        if (!fresh || (fresh.url === c.url && fresh.logo === c.logo) || origin(fresh.url) !== origin(c.url)) {return c;}
         changed = true;
         return { ...c, url: fresh.url, logo: fresh.logo };
       });
@@ -92,7 +94,7 @@ export class LineupStore {
   }
 
   add(ch: Channel): void {
-    if (this.keys().has(ch.key)) return;
+    if (this.keys().has(ch.key)) {return;}
     this.lineup.update(l => ({ ...l, channels: [...l.channels, ch] }));
   }
 
@@ -105,8 +107,8 @@ export class LineupStore {
   }
 
   toggle(ch: Channel): void {
-    if (this.keys().has(ch.key)) this.remove(ch.key);
-    else this.add(ch);
+    if (this.keys().has(ch.key)) {this.remove(ch.key);}
+    else {this.add(ch);}
   }
 
   move(key: string, delta: number): void {
@@ -114,7 +116,7 @@ export class LineupStore {
       const list = [...l.channels];
       const i = list.findIndex(c => c.key === key);
       const j = i + delta;
-      if (i < 0 || j < 0 || j >= list.length) return l;
+      if (i < 0 || j < 0 || j >= list.length) {return l;}
       [list[i], list[j]] = [list[j], list[i]];
       return { ...l, channels: list };
     });
@@ -131,7 +133,7 @@ export class LineupStore {
   /** Neighbor in lineup order, wrapping; used for channel up/down. */
   neighbor(key: string, delta: number): Channel | null {
     const list = this.channels();
-    if (!list.length) return null;
+    if (!list.length) {return null;}
     const i = list.findIndex(c => c.key === key);
     return list[(((i < 0 ? 0 : i) + delta) % list.length + list.length) % list.length];
   }
@@ -143,7 +145,7 @@ export class LineupStore {
   importJson(text: string): void {
     const d = JSON.parse(text);
     const lineup = d?.app === 'stormwatch' ? sanitizeLineup(d.lineup) : null;
-    if (!lineup) throw new Error('Not a Storm Watch export.');
+    if (!lineup) {throw new Error('Not a Storm Watch export.');}
     this.source.set(sanitizeSource(d.source));
     this.lineup.set(lineup);
   }

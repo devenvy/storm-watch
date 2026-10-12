@@ -1,8 +1,8 @@
+import { CdkDrag, type CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { CdkDrag, CdkDragDrop, CdkDragHandle, CdkDropList } from '@angular/cdk/drag-drop';
-import { BoardsStore, MAX_ROWS, Widget, WIDGET_TYPES, WidgetType } from '../core/boards.store';
-import { RadarSourceId } from '../core/radar-sources';
+
+import { BoardsStore, MAX_ROWS, type Widget, WIDGET_TYPES, type WidgetType } from '../core/boards.store';
 import { SettingsStore } from '../core/settings.store';
 import { LineupStore } from '../iptv/lineup.store';
 import { AlertsWidget } from './widgets/alerts-widget';
@@ -13,13 +13,14 @@ import { PlayerWidget } from './widgets/player-widget';
 import { RadarWidget } from './widgets/radar-widget';
 import { TropicalWidget } from './widgets/tropical-widget';
 
+import type { RadarSourceId } from '../core/radar-sources';
+
 /**
  * A user-built dashboard: a 12-column grid sized so `rows` rows fill the screen. Widgets
  * flow in order; edit mode lets you drag to reorder, resize, add and remove them.
  */
 @Component({
   selector: 'sw-dashboard',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink, CdkDropList, CdkDrag, CdkDragHandle,
     RadarWidget, PlayerWidget, ChannelsWidget, AlertsWidget, ConditionsWidget, TropicalWidget, LinksWidget,
@@ -44,7 +45,7 @@ import { TropicalWidget } from './widgets/tropical-widget';
 
         @if (editing()) {
           <div class="editbar">
-            <label>Name <input [value]="current().name" (change)="rename($event)" maxlength="40"></label>
+            <label>Name <input maxlength="40" [value]="current().name" (change)="rename($event)"></label>
             <label>Rows on screen
               <select (change)="setRows($event)">
                 @for (n of rowChoices; track n) { <option [value]="n" [selected]="n === current().rows">{{ n }}</option> }
@@ -57,17 +58,17 @@ import { TropicalWidget } from './widgets/tropical-widget';
             </label>
             <button (click)="add(addSel.value)">＋ Add widget</button>
             <span class="spacer"></span>
-            <button (click)="store.moveBoard(current().id, -1)" title="Move tab left" aria-label="Move tab left">◀</button>
-            <button (click)="store.moveBoard(current().id, 1)" title="Move tab right" aria-label="Move tab right">▶</button>
-            <button class="danger" (click)="removeBoard()" [disabled]="store.boards().length < 2">Delete board</button>
+            <button title="Move tab left" aria-label="Move tab left" (click)="store.moveBoard(current().id, -1)">◀</button>
+            <button title="Move tab right" aria-label="Move tab right" (click)="store.moveBoard(current().id, 1)">▶</button>
+            <button class="danger" [disabled]="store.boards().length < 2" (click)="removeBoard()">Delete board</button>
             <button class="danger" (click)="resetAll()">Reset all</button>
           </div>
         }
       }
 
       <div class="viewport">
-        <div class="grid" [style.--rows]="current().rows" [class.editing]="editable()"
-          cdkDropList cdkDropListOrientation="mixed" [cdkDropListDisabled]="!editable()"
+        <div class="grid" cdkDropList cdkDropListOrientation="mixed"
+          [style.--rows]="current().rows" [class.editing]="editable()" [cdkDropListDisabled]="!editable()"
           (cdkDropListDropped)="drop($event)">
           @for (w of current().widgets; track w.id) {
             <div class="cell" cdkDrag [style.--w]="w.w" [style.--h]="w.h" [style.--mh]="mobileRows(w)">
@@ -87,23 +88,23 @@ import { TropicalWidget } from './widgets/tropical-widget';
                   <span class="handle" cdkDragHandle title="Drag to move">⠿ {{ label(w.type) }}</span>
                   <span class="size">
                     <span class="grp">W
-                      <button (click)="store.resize(current().id, w.id, -1, 0)" aria-label="Narrower">−</button>
+                      <button aria-label="Narrower" (click)="store.resize(current().id, w.id, -1, 0)">−</button>
                       {{ w.w }}
-                      <button (click)="store.resize(current().id, w.id, 1, 0)" aria-label="Wider">+</button></span>
+                      <button aria-label="Wider" (click)="store.resize(current().id, w.id, 1, 0)">+</button></span>
                     <span class="grp">H
-                      <button (click)="store.resize(current().id, w.id, 0, -1)" aria-label="Shorter">−</button>
+                      <button aria-label="Shorter" (click)="store.resize(current().id, w.id, 0, -1)">−</button>
                       {{ w.h }}
-                      <button (click)="store.resize(current().id, w.id, 0, 1)" aria-label="Taller">+</button></span>
+                      <button aria-label="Taller" (click)="store.resize(current().id, w.id, 0, 1)">+</button></span>
                   </span>
                   @if (w.type === 'player') {
-                    <select (change)="pin(w, $event)" aria-label="Pinned channel">
+                    <select aria-label="Pinned channel" (change)="pin(w, $event)">
                       <option value="" [selected]="!w.channel">Follows channel picker</option>
                       @for (c of lineup.channels(); track c.key) {
                         <option [value]="c.key" [selected]="c.key === w.channel">{{ c.name }}</option>
                       }
                     </select>
                   }
-                  <button class="danger" (click)="store.removeWidget(current().id, w.id)" aria-label="Remove widget">✕</button>
+                  <button class="danger" aria-label="Remove widget" (click)="store.removeWidget(current().id, w.id)">✕</button>
                 </div>
               }
             </div>
@@ -172,6 +173,7 @@ import { TropicalWidget } from './widgets/tropical-widget';
       .cell { grid-column: 1 / -1; grid-row: span var(--mh); }
     }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Dashboard {
   protected readonly store = inject(BoardsStore);
@@ -199,7 +201,7 @@ export class Dashboard {
 
   /** Stacked layout height in 120px rows. */
   protected mobileRows(w: Widget): number {
-    if (w.type === 'radar' || w.type === 'player') return Math.max(3, Math.min(w.h, 5));
+    if (w.type === 'radar' || w.type === 'player') {return Math.max(3, Math.min(w.h, 5));}
     return Math.max(1, Math.min(w.h, 4));
   }
 
@@ -240,13 +242,13 @@ export class Dashboard {
 
   protected removeBoard(): void {
     const cur = this.current();
-    if (!confirm(`Delete the "${cur.name}" dashboard?`)) return;
+    if (!confirm(`Delete the "${cur.name}" dashboard?`)) {return;}
     this.store.removeBoard(cur.id);
     this.router.navigate(['/d', this.store.first().id]);
   }
 
   protected resetAll(): void {
-    if (!confirm('Replace all dashboards with the defaults?')) return;
+    if (!confirm('Replace all dashboards with the defaults?')) {return;}
     this.store.reset();
     this.router.navigate(['/']);
   }

@@ -1,14 +1,13 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { HomeLocation } from '../../core/settings.store';
+
+import type { HomeLocation } from '../../core/settings.store';
 
 @Component({
   selector: 'sw-links-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'panel widget' },
   template: `
     <h2><span class="title">Links</span></h2>
     <div class="scroll links">
-      <a [href]="'https://www.weather.gov/' + location().office.toLowerCase()" target="_blank" rel="noopener">NWS {{ location().office }}</a>
+      <a target="_blank" rel="noopener" [href]="'https://www.weather.gov/' + location().office.toLowerCase()">NWS {{ location().office }}</a>
       <a href="https://www.spc.noaa.gov/products/watch/" target="_blank" rel="noopener">SPC watches</a>
       <a href="https://www.spc.noaa.gov/products/md/" target="_blank" rel="noopener">SPC discussions</a>
       <a href="https://www.spc.noaa.gov/products/outlook/" target="_blank" rel="noopener">SPC outlooks</a>
@@ -18,6 +17,8 @@ import { HomeLocation } from '../../core/settings.store';
     </div>
   `,
   styles: `.links { display: flex; gap: 6px 14px; flex-wrap: wrap; align-content: start; }`,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' }
 })
 export class LinksWidget {
   readonly location = input.required<HomeLocation>();

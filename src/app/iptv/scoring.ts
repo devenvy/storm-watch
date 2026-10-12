@@ -1,4 +1,4 @@
-import { Channel } from './models';
+import type { Channel } from './models';
 
 export interface ScoreContext {
   city: string;
@@ -44,8 +44,8 @@ const STATES: Record<string, string> = {
 
 function countryOf(text: string): string | null {
   const tag = text.match(COUNTRY_TAG)?.[1];
-  if (!tag) return null;
-  for (const [iso, aliases] of Object.entries(COUNTRY_ALIASES)) if (aliases.includes(tag)) return iso;
+  if (!tag) {return null;}
+  for (const [iso, aliases] of Object.entries(COUNTRY_ALIASES)) {if (aliases.includes(tag)) {return iso;}}
   return tag;
 }
 
@@ -61,19 +61,19 @@ export function scoreChannel(ch: Channel, ctx: ScoreContext): Suggestion {
   const reasons: string[] = [];
   const add = (n: number, why: string) => { score += n; reasons.push(why); };
 
-  if (ctx.city.length >= 3 && new RegExp(`\\b${escapeRe(ctx.city)}\\b`, 'i').test(both)) add(60, `Mentions ${ctx.city}`);
+  if (ctx.city.length >= 3 && new RegExp(`\\b${escapeRe(ctx.city)}\\b`, 'i').test(both)) {add(60, `Mentions ${ctx.city}`);}
   const stateName = STATES[ctx.state];
-  if (stateName && new RegExp(`\\b${escapeRe(stateName)}\\b`, 'i').test(both)) add(20, `Mentions ${stateName}`);
-  if (WEATHER.test(name)) add(55, 'Weather channel');
-  else if (WEATHER.test(cat)) add(30, 'Weather category');
-  if (NEWS.test(name)) add(20, 'News channel');
-  else if (NEWS.test(cat)) add(15, 'News category');
-  if (LOCAL.test(cat)) add(20, 'Local category');
-  if (ctx.country === 'US' && CALLSIGN.test(name)) add(10, 'US station call sign');
-  if (NETWORK.test(name)) add(5, 'Broadcast network');
+  if (stateName && new RegExp(`\\b${escapeRe(stateName)}\\b`, 'i').test(both)) {add(20, `Mentions ${stateName}`);}
+  if (WEATHER.test(name)) {add(55, 'Weather channel');}
+  else if (WEATHER.test(cat)) {add(30, 'Weather category');}
+  if (NEWS.test(name)) {add(20, 'News channel');}
+  else if (NEWS.test(cat)) {add(15, 'News category');}
+  if (LOCAL.test(cat)) {add(20, 'Local category');}
+  if (ctx.country === 'US' && CALLSIGN.test(name)) {add(10, 'US station call sign');}
+  if (NETWORK.test(name)) {add(5, 'Broadcast network');}
 
   const tagged = countryOf(name) ?? countryOf(cat);
-  if (tagged && tagged === ctx.country) add(10, 'Your country');
+  if (tagged && tagged === ctx.country) {add(10, 'Your country');}
   else if (tagged) { score -= 50; reasons.push(`Other country (${tagged})`); }
   if (JUNK.test(both)) { score -= 35; reasons.push('Likely not live news'); }
 

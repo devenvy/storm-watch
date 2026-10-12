@@ -1,10 +1,12 @@
 import { inject, Injectable } from '@angular/core';
-import { Board, BoardsStore, sanitizeBoards } from './boards.store';
-import { HomeLocation, sanitizeLocation, SettingsStore } from './settings.store';
+
+import { type Board, BoardsStore, sanitizeBoards } from './boards.store';
+import { type HomeLocation, sanitizeLocation, SettingsStore } from './settings.store';
 import { Persist } from './storage/persist';
 import { LineupStore } from '../iptv/lineup.store';
-import { Lineup, Source } from '../iptv/models';
 import { sanitizeLineup, sanitizeSource } from '../iptv/validate';
+
+import type { Lineup, Source } from '../iptv/models';
 
 /**
  * Share links carry a device setup in the URL *fragment* (everything after #), which
@@ -31,8 +33,8 @@ const MAX_JSON = 512_000;
 
 function toBase64Url(bytes: Uint8Array): string {
   let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  for (let i = 0; i < bytes.length; i += 0x8000) {bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));}
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 }
 
 function fromBase64Url(s: string): Uint8Array {
@@ -44,13 +46,13 @@ function fromBase64Url(s: string): Uint8Array {
 async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream, limit = Infinity): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
   // Not awaited: the readable side must be drained concurrently or large inputs stall.
-  void writer.write(bytes as Uint8Array<ArrayBuffer>).then(() => writer.close()).catch(() => undefined);
+  void writer.write(bytes as Uint8Array<ArrayBuffer>).then(async () => writer.close()).catch(() => undefined);
   const reader = stream.readable.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {break;}
     size += value.length;
     if (size > limit) {
       await reader.cancel().catch(() => undefined);
@@ -67,21 +69,21 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
 
 export async function encodePayload(p: SharePayload): Promise<string> {
   const json = new TextEncoder().encode(JSON.stringify(p));
-  if (typeof CompressionStream === 'undefined') return 'j' + toBase64Url(json);
-  return 'z' + toBase64Url(await pipe(json, new CompressionStream('deflate-raw')));
+  if (typeof CompressionStream === 'undefined') {return `j${  toBase64Url(json)}`;}
+  return `z${  toBase64Url(await pipe(json, new CompressionStream('deflate-raw')))}`;
 }
 
 export async function decodePayload(s: string): Promise<unknown> {
-  if (s.length > MAX_ENCODED) throw new Error('Share link is too large.');
+  if (s.length > MAX_ENCODED) {throw new Error('Share link is too large.');}
   const kind = s[0];
   let bytes = fromBase64Url(s.slice(1));
   if (kind === 'z') {
-    if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot open compressed share links.');
+    if (typeof DecompressionStream === 'undefined') {throw new Error('This browser cannot open compressed share links.');}
     bytes = await pipe(bytes, new DecompressionStream('deflate-raw'), MAX_JSON);
   } else if (kind !== 'j') {
     throw new Error('Unrecognized share link.');
   }
-  if (bytes.length > MAX_JSON) throw new Error('Share link is too large.');
+  if (bytes.length > MAX_JSON) {throw new Error('Share link is too large.');}
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
@@ -113,25 +115,25 @@ export class ShareService {
   async apply(encoded: string): Promise<boolean> {
     await this.persist.ready();
     const raw = (await decodePayload(encoded)) as Partial<SharePayload>;
-    if (raw?.app !== 'stormwatch' || raw.v !== 1) throw new Error('Not a Storm Watch share link.');
+    if (raw?.app !== 'stormwatch' || raw.v !== 1) {throw new Error('Not a Storm Watch share link.');}
 
     const location = sanitizeLocation(raw.location);
     const boards = sanitizeBoards(raw.boards);
     const source = sanitizeSource(raw.source);
     const lineup = source ? sanitizeLineup(raw.lineup) : null;
 
-    const hasSetup = !!this.settings.location() || !!this.lineup.source();
+    const hasSetup = Boolean(this.settings.location()) || Boolean(this.lineup.source());
     if (hasSetup && this.lastApplied() !== encoded) {
       const parts = [location && 'location', boards && 'dashboards', source && 'IPTV login + channels'].filter(Boolean);
-      if (!confirm(`Apply this shared Storm Watch setup? It replaces your ${parts.join(', ')} on this device.`)) return false;
+      if (!confirm(`Apply this shared Storm Watch setup? It replaces your ${parts.join(', ')} on this device.`)) {return false;}
     }
 
-    if (location) this.settings.location.set(location);
-    if (boards) this.boards.boards.set(boards);
-    if (typeof raw.autoTune === 'boolean') this.settings.autoTune.set(raw.autoTune);
+    if (location) {this.settings.location.set(location);}
+    if (boards) {this.boards.boards.set(boards);}
+    if (typeof raw.autoTune === 'boolean') {this.settings.autoTune.set(raw.autoTune);}
     if (source) {
       this.lineup.source.set(source);
-      if (lineup) this.lineup.lineup.set(lineup);
+      if (lineup) {this.lineup.lineup.set(lineup);}
       // Re-poll the provider so channel URLs and logos are current.
       void this.lineup.loadCatalog();
     }

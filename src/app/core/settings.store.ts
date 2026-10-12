@@ -1,7 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { Persist } from './storage/persist';
-import { PointInfo } from './nws.service';
+
 import { num, str } from './guards';
+import { Persist } from './storage/persist';
+
+import type { PointInfo } from './nws.service';
 
 export interface HomeLocation extends PointInfo {
   lat: number;
@@ -11,9 +13,9 @@ export interface HomeLocation extends PointInfo {
 
 export function sanitizeLocation(v: unknown): HomeLocation | null {
   const l = v as Partial<HomeLocation> | null;
-  if (!l || !num(l.lat, -90, 90) || !num(l.lon, -180, 180)) return null;
-  if (!str(l.office, 4) || !/^[A-Z]{3}$/.test(l.office) || !str(l.radarStation, 4) || !/^[A-Z]{4}$/.test(l.radarStation)) return null;
-  if (!str(l.stationsUrl, 300) || !l.stationsUrl.startsWith('https://api.weather.gov/')) return null;
+  if (!l || !num(l.lat, -90, 90) || !num(l.lon, -180, 180)) {return null;}
+  if (!str(l.office, 4) || !/^[A-Z]{3}$/.test(l.office) || !str(l.radarStation, 4) || !/^[A-Z]{4}$/.test(l.radarStation)) {return null;}
+  if (!str(l.stationsUrl, 300) || !l.stationsUrl.startsWith('https://api.weather.gov/')) {return null;}
   return {
     lat: l.lat, lon: l.lon, office: l.office, radarStation: l.radarStation, stationsUrl: l.stationsUrl,
     label: str(l.label, 80) ? l.label : `${l.lat.toFixed(2)}, ${l.lon.toFixed(2)}`,

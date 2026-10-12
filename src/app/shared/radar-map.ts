@@ -1,11 +1,13 @@
+import { DatePipe } from '@angular/common';
 import {
-  afterNextRender, ChangeDetectionStrategy, Component, computed, effect, ElementRef, inject, input, OnDestroy, signal, untracked,
+  afterNextRender, ChangeDetectionStrategy, Component, computed, effect, type ElementRef, inject, input, type OnDestroy, signal, untracked,
   viewChild,
 } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import * as L from 'leaflet';
-import { WarningShape } from '../core/nws.service';
-import { RadarFrame, RadarSet, RadarSourceId, RadarSources } from '../core/radar-sources';
+
+import { type RadarFrame, type RadarSet, type RadarSourceId, RadarSources } from '../core/radar-sources';
+
+import type { WarningShape } from '../core/nws.service';
 
 const SPEEDS = { slow: 1400, normal: 800, fast: 350 } as const;
 type Speed = keyof typeof SPEEDS;
@@ -30,7 +32,7 @@ function popup(event: string, headline: string): HTMLElement {
 
 function relative(t: Date, now: number): string {
   const m = Math.round((t.getTime() - now) / 60_000);
-  if (Math.abs(m) < 3) return 'now';
+  if (Math.abs(m) < 3) {return 'now';}
   const sign = m < 0 ? '−' : '+';
   const a = Math.abs(m);
   return a < 60 ? `${sign}${a} min` : `${sign}${Math.floor(a / 60)} h${a % 60 ? ` ${a % 60} m` : ''}`;
@@ -39,9 +41,7 @@ function relative(t: Date, now: number): string {
 /** Radar map with a scrubbable timeline over any RadarSources frame set, plus warning polygons. */
 @Component({
   selector: 'sw-radar-map',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe],
-  host: { '(keydown)': 'onKey($event)' },
   template: `
     <div class="mapwrap">
       <div #map class="map" tabindex="0" aria-label="Radar map"></div>
@@ -51,26 +51,26 @@ function relative(t: Date, now: number): string {
     </div>
     <div class="timeline">
       <div class="controls">
-        <button (click)="go(0)" title="First" aria-label="First frame">⏮</button>
-        <button (click)="step(-1)" title="Back (←)" aria-label="Previous frame">◀</button>
-        <button class="play" (click)="playing.set(!playing())" [attr.aria-label]="playing() ? 'Pause' : 'Play'">
+        <button title="First" aria-label="First frame" (click)="go(0)">⏮</button>
+        <button title="Back (←)" aria-label="Previous frame" (click)="step(-1)">◀</button>
+        <button class="play" [attr.aria-label]="playing() ? 'Pause' : 'Play'" (click)="playing.set(!playing())">
           {{ playing() ? '⏸' : '▶' }}</button>
-        <button (click)="step(1)" title="Forward (→)" aria-label="Next frame">▶</button>
-        <button (click)="go(set().startIndex)" title="Latest observed" aria-label="Latest observed frame">●</button>
-        <button (click)="go(last())" title="Last" aria-label="Last frame">⏭</button>
+        <button title="Forward (→)" aria-label="Next frame" (click)="step(1)">▶</button>
+        <button title="Latest observed" aria-label="Latest observed frame" (click)="go(set().startIndex)">●</button>
+        <button title="Last" aria-label="Last frame" (click)="go(last())">⏭</button>
         @if (frame(); as f) {
           <span class="time" [class.future]="f.kind === 'forecast'">
             <b>{{ f.time | date: 'h:mm a' }}</b><small>{{ rel(f.time) }}</small>
           </span>
         }
-        <select [value]="speed()" (change)="speed.set($any($event.target).value)" aria-label="Playback speed">
+        <select aria-label="Playback speed" [value]="speed()" (change)="speed.set($any($event.target).value)">
           <option value="slow">Slow</option><option value="normal">Normal</option><option value="fast">Fast</option>
         </select>
       </div>
       <div class="track">
-        @if (nowPct() !== null) { <span class="nowline" [style.left.%]="nowPct()" title="Now"></span> }
-        <input type="range" min="0" [max]="last()" step="1" [value]="index()"
-          (input)="go(+$any($event.target).value)" aria-label="Radar time">
+        @if (nowPct() !== null) { <span class="nowline" title="Now" [style.left.%]="nowPct()"></span> }
+        <input type="range" min="0" step="1" aria-label="Radar time" [max]="last()"
+          [value]="index()" (input)="go(+$any($event.target).value)">
       </div>
       <div class="ticks">
         @for (t of ticks(); track t.i) {
@@ -118,6 +118,8 @@ function relative(t: Date, now: number): string {
     .note { color: #b392f0; }
     .link { margin-left: auto; padding: 2px 8px; font-size: 12px; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(keydown)': 'onKey($event)' }
 })
 export class RadarMap implements OnDestroy {
   readonly center = input.required<[number, number]>();
@@ -154,9 +156,9 @@ export class RadarMap implements OnDestroy {
   private readonly ready = signal(false);
   private map?: L.Map;
   private layers: L.TileLayer[] = [];
-  private polys = L.layerGroup();
+  private readonly polys = L.layerGroup();
   private home?: L.CircleMarker;
-  private timers: ReturnType<typeof setInterval>[] = [];
+  private readonly timers: ReturnType<typeof setInterval>[] = [];
   private shown = -1;
   private loadSeq = 0;
   private resize?: ResizeObserver;
@@ -183,15 +185,15 @@ export class RadarMap implements OnDestroy {
     effect(() => {
       this.source();
       this.station();
-      if (this.ready()) untracked(() => this.reload(false));
+      if (this.ready()) {untracked(async () => this.reload(false));}
     });
 
     // Show the selected frame.
     effect(() => {
       const i = this.index();
       this.set();
-      if (!this.ready() || !this.layers[i]) return;
-      if (this.shown >= 0 && this.layers[this.shown]) this.layers[this.shown].setOpacity(0);
+      if (!this.ready() || !this.layers[i]) {return;}
+      if (this.shown >= 0 && this.layers[this.shown]) {this.layers[this.shown].setOpacity(0);}
       this.layers[i].setOpacity(0.75);
       this.shown = i;
     });
@@ -199,7 +201,7 @@ export class RadarMap implements OnDestroy {
     // Playback; holds on the newest observed frame and the final frame so loop boundaries are obvious.
     effect(onCleanup => {
       const frames = this.set().frames;
-      if (!this.playing() || frames.length < 2) return;
+      if (!this.playing() || frames.length < 2) {return;}
       const i = this.index();
       const hold = i === this.set().startIndex || i === this.last() ? 2.5 : 1;
       const t = setTimeout(() => this.index.set((i + 1) % frames.length), SPEEDS[this.speed()] * hold);
@@ -208,7 +210,7 @@ export class RadarMap implements OnDestroy {
 
     effect(() => {
       const shapes = this.shapes();
-      if (!this.ready()) return;
+      if (!this.ready()) {return;}
       this.polys.clearLayers();
       for (const s of shapes) {
         L.geoJSON(s.geometry, { style: { color: COLORS[s.event] ?? '#fff', weight: 2, fillOpacity: 0.18 } })
@@ -219,7 +221,7 @@ export class RadarMap implements OnDestroy {
 
     effect(() => {
       const c = this.center();
-      if (!this.ready()) return;
+      if (!this.ready()) {return;}
       this.home?.setLatLng(c);
       this.map?.setView(c, this.map.getZoom());
     });
@@ -236,7 +238,7 @@ export class RadarMap implements OnDestroy {
     this.loading.set(true);
     try {
       const next = await this.sources.load(this.source(), this.station());
-      if (seq !== this.loadSeq || !this.map) return;
+      if (seq !== this.loadSeq || !this.map) {return;}
       this.layers.forEach(l => l.remove());
       // Every frame stays on the map at opacity 0 so tiles preload and scrubbing is instant.
       this.layers = next.frames.map(f =>
@@ -247,9 +249,9 @@ export class RadarMap implements OnDestroy {
       this.index.set(kept >= 0 ? kept : next.startIndex);
       this.error.set(null);
     } catch (e) {
-      if (seq === this.loadSeq) this.error.set('Radar source unavailable: ' + (e as Error).message);
+      if (seq === this.loadSeq) {this.error.set(`Radar source unavailable: ${  (e as Error).message}`);}
     } finally {
-      if (seq === this.loadSeq) this.loading.set(false);
+      if (seq === this.loadSeq) {this.loading.set(false);}
     }
   }
 
@@ -271,7 +273,7 @@ export class RadarMap implements OnDestroy {
   }
 
   protected onKey(e: KeyboardEvent): void {
-    if ((e.target as HTMLElement).tagName === 'SELECT') return;
+    if ((e.target as HTMLElement).tagName === 'SELECT') {return;}
     if (e.key === 'ArrowLeft') { this.step(-1); e.preventDefault(); }
     else if (e.key === 'ArrowRight') { this.step(1); e.preventDefault(); }
     else if (e.key === ' ') { this.playing.set(!this.playing()); e.preventDefault(); }

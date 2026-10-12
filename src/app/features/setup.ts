@@ -1,15 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { DatePipe, DecimalPipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, linkedSignal, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
 import { BoardsStore } from '../core/boards.store';
 import { NwsService } from '../core/nws.service';
-import { ShareService } from '../core/share';
 import { SettingsStore } from '../core/settings.store';
+import { ShareService } from '../core/share';
 import { LineupStore } from '../iptv/lineup.store';
-import { Source } from '../iptv/models';
 import { suggest } from '../iptv/scoring';
-import { XtreamAccount, xtreamLogin } from '../iptv/sources';
+import { type XtreamAccount, xtreamLogin } from '../iptv/sources';
 import { ChannelLogo } from '../shared/channel-logo';
+
+import type { Source } from '../iptv/models';
 
 interface GeoResult {
   name: string;
@@ -21,7 +23,6 @@ interface GeoResult {
 
 @Component({
   selector: 'sw-setup',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, DatePipe, DecimalPipe, ChannelLogo],
   template: `
     <div class="wrap">
@@ -61,12 +62,12 @@ interface GeoResult {
             <input #server placeholder="Server, e.g. http://host:8080" [value]="xt()?.server ?? ''">
             <input #user placeholder="Username" autocomplete="off" [value]="xt()?.username ?? ''">
             <input #pass type="password" placeholder="Password" autocomplete="off" [value]="xt()?.password ?? ''">
-            <button (click)="connectXtream(server.value, user.value, pass.value)" [disabled]="busy()">Connect</button>
+            <button [disabled]="busy()" (click)="connectXtream(server.value, user.value, pass.value)">Connect</button>
           </div>
         } @else {
           <div class="form">
             <input #m3u placeholder="https://…/playlist.m3u" [value]="m3uUrl()">
-            <button (click)="connectM3u(m3u.value)" [disabled]="busy()">Load</button>
+            <button [disabled]="busy()" (click)="connectM3u(m3u.value)">Load</button>
           </div>
         }
         @if (account(); as a) {
@@ -110,22 +111,22 @@ interface GeoResult {
       <!-- 4. Lineup -->
       <section class="panel" id="lineup">
         <h2>4 · Storm lineup <small class="muted">({{ lineup.channels().length }})</small></h2>
-        @for (c of lineup.channels(); track c.key; let i = $index, first = $first, last = $last) {
+        @for (c of lineup.channels(); track c.key) {
           <div class="lrow">
-            <span class="num">{{ i + 1 }}</span>
+            <span class="num">{{ $index + 1 }}</span>
             <input class="lname" [value]="c.name" (change)="lineup.rename(c.key, $any($event.target).value)">
-            <button (click)="lineup.move(c.key, -1)" [disabled]="first" aria-label="Move up">↑</button>
-            <button (click)="lineup.move(c.key, 1)" [disabled]="last" aria-label="Move down">↓</button>
-            <button (click)="lineup.setDefault(c.key)" [class.on]="lineup.defaultChannel()?.key === c.key"
-              title="Default channel for warnings">★</button>
+            <button aria-label="Move up" [disabled]="$first" (click)="lineup.move(c.key, -1)">↑</button>
+            <button aria-label="Move down" [disabled]="$last" (click)="lineup.move(c.key, 1)">↓</button>
+            <button title="Default channel for warnings" [class.on]="lineup.defaultChannel()?.key === c.key"
+              (click)="lineup.setDefault(c.key)">★</button>
             <a [routerLink]="['/watch', c.key]">Test</a>
-            <button (click)="lineup.remove(c.key)" aria-label="Remove">✕</button>
+            <button aria-label="Remove" (click)="lineup.remove(c.key)">✕</button>
           </div>
         } @empty {
           <p class="muted">Empty. Connect a source and pick channels above, or import a lineup file.</p>
         }
         <div class="row">
-          <button (click)="exportLineup()" [disabled]="!lineup.channels().length">Export</button>
+          <button [disabled]="!lineup.channels().length" (click)="exportLineup()">Export</button>
           <label class="btn">Import<input type="file" accept="application/json" hidden (change)="importLineup($event)"></label>
           @if (importMsg()) { <span class="muted">{{ importMsg() }}</span> }
         </div>
@@ -146,14 +147,14 @@ interface GeoResult {
           </label>
           <label class="check"><input type="checkbox" [checked]="shareKiosk()" (change)="shareKiosk.set(!shareKiosk())">
             Kiosk mode (no menus, for TVs)</label>
-          <label class="check"><input type="checkbox" [checked]="shareIptv()" (change)="shareIptv.set(!shareIptv())"
-            [disabled]="!lineup.source()"> Include IPTV login and channel lineup</label>
+          <label class="check"><input type="checkbox" [checked]="shareIptv()" [disabled]="!lineup.source()"
+            (change)="shareIptv.set(!shareIptv())"> Include IPTV login and channel lineup</label>
         </div>
         @if (shareIptv() && !shareUrl()) {
           <p class="warn">⚠ The link will contain your IPTV username and password.</p>
         }
         <div class="row">
-          <button (click)="makeShare()" [disabled]="!settings.location()">Create link</button>
+          <button [disabled]="!settings.location()" (click)="makeShare()">Create link</button>
           @if (shareUrl()) {
             <button (click)="copyShare()">{{ copied() ? 'Copied ✓' : 'Copy' }}</button>
             <span class="muted small">{{ shareUrl().length | number }} characters</span>
@@ -164,7 +165,7 @@ interface GeoResult {
             and avoid pasting it anywhere that is logged or shared.</p>
         }
         @if (shareUrl()) {
-          <textarea class="share" readonly rows="3" [value]="shareUrl()" aria-label="Share link"></textarea>
+          <textarea class="share" readonly rows="3" aria-label="Share link" [value]="shareUrl()"></textarea>
         }
         @if (shareError()) { <p class="err">{{ shareError() }}</p> }
       </section>
@@ -198,6 +199,7 @@ interface GeoResult {
       border: 1px solid var(--line); border-radius: 6px; padding: 6px; word-break: break-all; }
     @media (max-width: 640px) { .item { grid-template-columns: auto 32px minmax(0, 1fr); } .why { grid-column: 3; } }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class Setup {
   protected readonly settings = inject(SettingsStore);
@@ -234,7 +236,7 @@ export class Setup {
 
   protected readonly searchResults = computed(() => {
     const q = this.query().trim().toLowerCase();
-    if (q.length < 2) return [];
+    if (q.length < 2) {return [];}
     return this.lineup.catalog()
       .filter(c => c.name.toLowerCase().includes(q) || c.category?.toLowerCase().includes(q))
       .slice(0, 200);
@@ -251,21 +253,21 @@ export class Setup {
 
     // Saved source (hydrates async): reload the catalog so suggestions/search are ready without re-entering credentials.
     effect(() => {
-      if (!this.lineup.source()) return;
+      if (!this.lineup.source()) {return;}
       untracked(() => {
-        if (!this.lineup.catalog().length && !this.lineup.catalogLoading()) this.lineup.loadCatalog();
+        if (!this.lineup.catalog().length && !this.lineup.catalogLoading()) {this.lineup.loadCatalog();}
       });
     });
   }
 
   protected async search(q: string): Promise<void> {
     this.locError.set(null);
-    if (!q.trim()) return;
+    if (!q.trim()) {return;}
     try {
       const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q.trim())}&count=8&countryCode=US`);
       const d = await r.json();
       this.geoResults.set(d.results ?? []);
-      if (!d.results?.length) this.locError.set('No matches.');
+      if (!d.results?.length) {this.locError.set('No matches.');}
     } catch {
       this.locError.set('Location search failed.');
     }
@@ -274,8 +276,8 @@ export class Setup {
   protected useGps(): void {
     this.locError.set(null);
     navigator.geolocation?.getCurrentPosition(
-      p => this.pick(p.coords.latitude, p.coords.longitude),
-      e => this.locError.set('Location unavailable: ' + e.message),
+      async p => this.pick(p.coords.latitude, p.coords.longitude),
+      e => this.locError.set(`Location unavailable: ${  e.message}`),
       { enableHighAccuracy: false, timeout: 10_000 },
     );
   }
@@ -319,14 +321,14 @@ export class Setup {
     this.shareError.set(null);
     this.copied.set(false);
     try {
-      const includeIptv = this.shareIptv() && !!this.lineup.source();
+      const includeIptv = this.shareIptv() && Boolean(this.lineup.source());
       const seq = ++this.shareSeq;
       const cfg = await this.share.create({ includeIptv });
       // Options changed while compressing: this link no longer matches them.
-      if (seq !== this.shareSeq) return;
+      if (seq !== this.shareSeq) {return;}
       this.shareHasLogin.set(includeIptv);
       const q = new URLSearchParams({ cfg });
-      if (this.shareKiosk()) q.set('kiosk', '1');
+      if (this.shareKiosk()) {q.set('kiosk', '1');}
       const base = location.href.split('#')[0];
       this.shareUrl.set(`${base}#/d/${encodeURIComponent(this.shareBoard())}?${q}`);
     } catch (e) {
@@ -354,7 +356,7 @@ export class Setup {
 
   protected async importLineup(e: Event): Promise<void> {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (!file) return;
+    if (!file) {return;}
     try {
       this.lineup.importJson(await file.text());
       this.importMsg.set(`Imported ${this.lineup.channels().length} channels.`);

@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+
 import { IndexedDbBackend } from './indexeddb.backend';
 
 /**
@@ -8,9 +9,9 @@ import { IndexedDbBackend } from './indexeddb.backend';
  */
 export interface StorageBackend {
   readonly name: string;
-  get<T>(key: string): Promise<T | undefined>;
-  set<T>(key: string, value: T): Promise<void>;
-  remove(key: string): Promise<void>;
+  get: <T>(key: string) => Promise<T | undefined>;
+  set: <T>(key: string, value: T) => Promise<void>;
+  remove: (key: string) => Promise<void>;
 }
 
 export const STORAGE_BACKEND = new InjectionToken<StorageBackend>('STORAGE_BACKEND', {

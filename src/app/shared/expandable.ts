@@ -6,11 +6,11 @@ import { ChangeDetectionStrategy, Component, Directive, ElementRef, inject, inpu
  */
 @Directive({
   selector: '[swExpandable]',
-  exportAs: 'card',
   host: {
     '[class.card-expanded]': 'expanded()',
     '(document:keydown.escape)': 'expanded.set(false)',
   },
+  exportAs: 'card'
 })
 export class Expandable {
   readonly expanded = signal(false);
@@ -21,25 +21,25 @@ export class Expandable {
   }
 
   fullscreen(): void {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else this.el.nativeElement.requestFullscreen?.();
+    if (document.fullscreenElement) {document.exitFullscreen();}
+    else {this.el.nativeElement.requestFullscreen?.();}
   }
 }
 
 @Component({
   selector: 'sw-card-buttons',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (card().expanded()) {
-      <button (click)="card().fullscreen()" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+      <button title="Fullscreen" aria-label="Fullscreen" (click)="card().fullscreen()">⛶</button>
     }
-    <button (click)="card().toggle()" [title]="card().expanded() ? 'Close (Esc)' : 'Expand'"
-      [attr.aria-label]="card().expanded() ? 'Close' : 'Expand'">{{ card().expanded() ? '✕' : '⤢' }}</button>
+    <button [title]="card().expanded() ? 'Close (Esc)' : 'Expand'" [attr.aria-label]="card().expanded() ? 'Close' : 'Expand'"
+      (click)="card().toggle()">{{ card().expanded() ? '✕' : '⤢' }}</button>
   `,
   styles: `
     :host { display: inline-flex; gap: 4px; text-transform: none; letter-spacing: 0; }
     button { padding: 1px 7px; font-size: 13px; line-height: 1.4; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CardButtons {
   readonly card = input.required<Expandable>();

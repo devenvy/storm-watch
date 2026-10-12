@@ -1,15 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+
 import { AlertsStore } from '../../core/alerts.store';
 import { dangerLabel } from '../../core/nws.service';
 import { CardButtons, Expandable } from '../../shared/expandable';
 
 @Component({
   selector: 'sw-alerts-widget',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DatePipe, CardButtons],
-  hostDirectives: [Expandable],
-  host: { class: 'panel widget' },
   template: `
     <h2><span class="title">Alerts · {{ alerts.alerts().length }}</span>
       <span class="meta">{{ alerts.updatedAt() | date: 'shortTime' }}</span>
@@ -48,6 +46,9 @@ import { CardButtons, Expandable } from '../../shared/expandable';
     :host(.card-expanded) pre { font-size: 14px; }
     :host(.card-expanded) .alert summary b { font-size: 16px; }
   `,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'panel widget' },
+  hostDirectives: [Expandable]
 })
 export class AlertsWidget {
   protected readonly alerts = inject(AlertsStore);

@@ -2,7 +2,7 @@ const POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'S
 
 /** Compass point for a bearing in degrees ('' when unknown). */
 export function compass(deg: number | null | undefined): string {
-  if (deg == null) return '';
+  if (deg == null) {return '';}
   return POINTS[Math.round((((deg % 360) + 360) % 360) / 22.5) % 16];
 }
 
