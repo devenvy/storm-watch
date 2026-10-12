@@ -2,7 +2,8 @@ name: Release
 
 # Every push to main updates the release PR (release-please) and enables auto-merge on it, so a
 # merged feat:/fix: PR is released once the release PR's checks pass. When the release PR merges,
-# this run attaches the static build to the GitHub Release and publishes the container image.
+# this run attaches the static build and an SPDX SBOM to the GitHub Release and publishes the
+# container image (with its own SBOM and provenance), attesting the build provenance of both.
 # release-please runs as the devenvy-bot app (org variable DEVENVY_BOT_CLIENT_ID, org secret
 # DEVENVY_BOT_PRIVATE_KEY) so its pull requests get CI; GITHUB_TOKEN ones would not.
 on:
@@ -32,6 +33,10 @@ jobs:
         with:
           client-id: ${{ vars.DEVENVY_BOT_CLIENT_ID }}
           private-key: ${{ secrets.DEVENVY_BOT_PRIVATE_KEY }}
+          # release PRs, tags, releases and their labels
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
@@ -54,6 +59,8 @@ jobs:
     permissions:
       contents: write # attach the build to the release
       packages: write # push the image to GHCR
+      id-token: write # build provenance attestations
+      attestations: write
     env:
       TAG: ${{ needs.release-please.outputs.tag }}
       VERSION: ${{ needs.release-please.outputs.version }}
@@ -66,15 +73,23 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+          # no dependency cache in a job that publishes (cache poisoning)
+          package-manager-cache: false
       - run: pnpm install --frozen-lockfile
       - run: pnpm run build
-      - name: Attach the static build to the GitHub release
+      - name: Zip the static build and write the SBOM
+        run: |
+          (cd dist/stormwatch/browser && zip -r "$GITHUB_WORKSPACE/stormwatch-$TAG.zip" .)
+          pnpm sbom --sbom-format spdx --prod --sbom-type application --out "stormwatch-$TAG.spdx.json"
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: stormwatch-${{ needs.release-please.outputs.tag }}.zip
+      - name: Attach the build and SBOM to the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          (cd dist/stormwatch/browser && zip -r "$GITHUB_WORKSPACE/stormwatch-$TAG.zip" .)
-          gh release upload "$TAG" "stormwatch-$TAG.zip" --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" "stormwatch-$TAG.zip" "stormwatch-$TAG.spdx.json" \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
       - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -91,7 +106,8 @@ jobs:
             type=semver,pattern={{version}},value=${{ needs.release-please.outputs.version }}
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.release-please.outputs.version }},enable=${{ !contains(needs.release-please.outputs.version, '-') }}
             type=raw,value=latest,enable=${{ !contains(needs.release-please.outputs.version, '-') }}
-      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+      - id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -100,3 +116,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max
           sbom: true
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true

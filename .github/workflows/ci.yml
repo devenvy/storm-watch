@@ -49,6 +49,13 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run format:check
       - run: pnpm run typecheck
+      - run: pnpm run knip
+      - name: actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+      - name: zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          advanced-security: false # fail the job on findings instead of uploading SARIF
 
   test:
     runs-on: ubuntu-latest
@@ -110,13 +117,31 @@ jobs:
           node-version-file: .nvmrc
       - run: pnpm audit --prod --audit-level high
 
+  # Fails a PR that adds a dependency with a known vulnerability (any severity) or a license
+  # outside the allow-list. Only changes in the PR count, so unrelated advisories never block.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+          fail-on-scopes: runtime, development
+          allow-licenses: >-
+            MIT, MIT-0, ISC, Apache-2.0, BSD-2-Clause, BSD-3-Clause, 0BSD, BlueOak-1.0.0,
+            CC0-1.0, CC-BY-4.0, MPL-2.0, Unlicense, Python-2.0
+
+  # Dockerfile lint, image build, vulnerability scan (fixable HIGH/CRITICAL fail) and smoke test.
   docker:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: hadolint
+        uses: hadolint/hadolint-action@06be81baf89a55ffd0e24b8f04a4185738dd3387 # v3.5.0
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -124,6 +149,13 @@ jobs:
           context: .
           load: true
           tags: stormwatch:ci
+      - name: Trivy
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: stormwatch:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
       - name: Smoke test
         run: |
           docker run -d --name sw --read-only --tmpfs /tmp --cap-drop ALL -p 8080:8080 stormwatch:ci
@@ -150,6 +182,9 @@ jobs:
         with:
           client-id: ${{ secrets.DEVENVY_BOT_CLIENT_ID }}
           private-key: ${{ secrets.DEVENVY_BOT_PRIVATE_KEY }}
+          # enabling auto-merge
+          permission-contents: write
+          permission-pull-requests: write
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -159,7 +194,7 @@ jobs:
   # Single required status check.
   result:
     if: always()
-    needs: [pr-title, lint, test, build, audit, docker]
+    needs: [pr-title, lint, test, build, audit, dependency-review, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -167,13 +202,19 @@ jobs:
       - name: All jobs passed
         env:
           PR_TITLE: ${{ needs.pr-title.result }}
+          DEPENDENCY_REVIEW: ${{ needs.dependency-review.result }}
           LINT: ${{ needs.lint.result }}
           TEST: ${{ needs.test.result }}
           BUILD: ${{ needs.build.result }}
           AUDIT: ${{ needs.audit.result }}
           DOCKER: ${{ needs.docker.result }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
-        # pr-title only runs on pull requests; the audit is informational there
+        # pr-title and dependency-review only run on pull requests; the audit is informational there
         run: |
           for result in "$LINT" "$TEST" "$BUILD" "$DOCKER"; do test "$result" = "success"; done
-          if [ "$IS_PR" = "true" ]; then test "$PR_TITLE" = "success"; else test "$AUDIT" = "success"; fi
+          if [ "$IS_PR" = "true" ]; then
+            test "$PR_TITLE" = "success"
+            test "$DEPENDENCY_REVIEW" = "success"
+          else
+            test "$AUDIT" = "success"
+          fi

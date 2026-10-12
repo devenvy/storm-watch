@@ -1,7 +1,8 @@
 version: 2
 
 # One weekly pull request for everything (npm, GitHub Actions, Docker base images), plus one per
-# ecosystem for security fixes.
+# ecosystem for security fixes. Version updates wait out a 7-day cooldown, so a compromised release
+# is usually caught before it reaches a PR (security updates are not delayed).
 # Major versions are left out so that PR stays green: they usually need code changes or are blocked by
 # Angular's supported ranges (e.g. Angular 22 requires TypeScript 6.0.x), and odd Node.js majors never
 # become LTS. Do major upgrades by hand (`ng update` for Angular; a new @devenvy/code-guidelines major
@@ -12,17 +13,21 @@ multi-ecosystem-groups:
       interval: weekly
       day: monday
     labels: [dependencies]
+    # conventional titles for release-please: dependency updates ship as a patch release
+    # (with multi-ecosystem groups, commit-message is only allowed on the group)
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
 
 updates:
   - package-ecosystem: npm
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
-    # conventional titles for release-please: dependency updates ship as a patch release
-    commit-message:
-      prefix: fix
-      prefix-development: chore
-      include: scope
+    cooldown:
+      default-days: 7
+      exclude: ['@devenvy/*'] # our own baseline updates arrive without delay
     groups:
       security:
         applies-to: security-updates
@@ -38,11 +43,8 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
-    # conventional titles for release-please: dependency updates ship as a patch release
-    commit-message:
-      prefix: fix
-      prefix-development: chore
-      include: scope
+    cooldown:
+      default-days: 7
     groups:
       security:
         applies-to: security-updates
@@ -55,11 +57,8 @@ updates:
     directory: /
     patterns: ['*']
     multi-ecosystem-group: dependencies
-    # conventional titles for release-please: dependency updates ship as a patch release
-    commit-message:
-      prefix: fix
-      prefix-development: chore
-      include: scope
+    cooldown:
+      default-days: 7
     groups:
       security:
         applies-to: security-updates
