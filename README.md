@@ -5,7 +5,9 @@ A severe-weather monitor that runs entirely in your browser. Pick a location and
 - **NWS alerts** for your point, with an EAS-style tone and desktop notification for danger-level warnings
 - **Radar** with a scrubbable timeline: past radar flowing into a 6-hour model forecast, local-site
   reflectivity and velocity (rotation), a second independent composite, and warning polygons on top
-- **Current conditions** from the nearest NWS observation station
+- **Current conditions** from the nearest *reporting* home weather station on the Ambient Weather Network
+  (rain rate, rain today and storm total, gusts; pick a different nearby station if you like), plus the
+  nearest reporting NWS station
 - **Tropical storms** from the National Hurricane Center, with forecast cones
 - **Live TV** from *your own* IPTV service (Xtream Codes or M3U), with a pre-picked "storm lineup" that
   can switch to a default channel automatically when a Tornado Warning is issued
@@ -44,7 +46,8 @@ CORS support decided what is included.
 | NWS office, radar site, nearest stations | [National Weather Service API](https://www.weather.gov/documentation/services-web-api) | `api.weather.gov/points/{lat},{lon}` |
 | Active alerts for your point | National Weather Service API | `api.weather.gov/alerts/active?point=` |
 | Warning polygons (tornado, severe t-storm, flash flood, extreme wind) | National Weather Service API | `api.weather.gov/alerts/active?event=` |
-| Current conditions | National Weather Service API | `api.weather.gov/stations/{id}/observations/latest` |
+| Current conditions (official) | National Weather Service API | `api.weather.gov/stations/{id}/observations/latest` |
+| Current conditions (nearby home stations) | [Ambient Weather Network](https://ambientweather.net/) public stations¹ | `lightning.ambientweather.net/devices?$publicBox…` |
 | Radar mosaic, last 50 min | [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/) (NEXRAD) | `cache/tile.py/1.0.0/nexrad-n0q-900913…` |
 | Forecast radar, next 6 h (HRRR model, simulated) | Iowa Environmental Mesonet | `cache/tile.py/1.0.0/hrrr::REFD-F…` |
 | Local radar reflectivity and velocity | Iowa Environmental Mesonet (NEXRAD Level III) | `json/radar.py`, `cache/tile.py/1.0.0/ridge::…` |
@@ -54,6 +57,11 @@ CORS support decided what is included.
 | Forecast cone graphic, advisories | [National Hurricane Center](https://www.nhc.noaa.gov/) | `nhc.noaa.gov/storm_graphics/…` |
 | Base map | [OpenStreetMap](https://www.openstreetmap.org/copyright) | `tile.openstreetmap.org` |
 | Live TV | **Your own** IPTV provider | Xtream Codes `player_api.php` or an M3U playlist |
+
+¹ Stations their owners have made public. This keyless endpoint is the one behind the Ambient Weather
+Network map (and Home Assistant's `ambient_network` integration); it is undocumented and may change, so
+Storm Watch treats it as optional, ignores stations that haven't reported in 30 minutes, and keeps only outdoor
+readings.
 
 Please respect these services: Storm Watch polls alerts and conditions once a minute and tropical data every
 ten minutes. If you run a busy public instance, consider the services' usage policies.
@@ -126,6 +134,7 @@ Your provider's connection limit applies: each playing TV widget uses one connec
 ## Privacy and security
 
 - No backend, no accounts, no analytics. Settings live in IndexedDB in your browser.
+- Weather services see the coordinates you set (that's how they answer); nothing else about you is sent.
 - IPTV credentials are only sent to your IPTV provider, and only leave the device in a share link or lineup
   export if you explicitly choose that.
 - Imported files and share links are validated (only `http(s)` URLs are accepted, sizes are capped), and
@@ -149,11 +158,17 @@ swapped (e.g. for a server-backed store) without touching features.
 
 ### CI / releases
 
-- **CI** (`.github/workflows/ci.yml`): lint, tests, production build, `npm audit`, and a Docker build with a
-  smoke test of the container and its security headers, on every push and pull request.
-- **Pages** (`pages.yml`): every push to `main` deploys to GitHub Pages (Settings → Pages → Source: GitHub
+- **Checks**, each its own workflow so it passes or fails on its own, on every pull request:
+  `lint.yml`, `test.yml`, `build.yml` (production build and size budgets), `audit.yml` (`npm audit` of
+  runtime dependencies, also weekly) and `docker.yml` (image build plus a smoke test of the container and its
+  security headers).
+- **CodeQL** (`codeql.yml`): security analysis of the TypeScript and the workflows on pull requests, `main`
+  and weekly.
+- **Dependabot**: one grouped pull request a week for npm, GitHub Actions and Docker updates (major
+  versions are upgraded by hand).
+- **Pages** (`pages.yml`): every push to `main` runs the checks and, when they pass, deploys to GitHub Pages (Settings → Pages → Source: GitHub
   Actions).
-- **Release** (`release.yml`): pushing a tag `vX.Y.Z` (or `vX.Y.Z-beta.N` for a pre-release) runs CI, attaches
+- **Release** (`release.yml`): pushing a tag `vX.Y.Z` (or `vX.Y.Z-beta.N` for a pre-release) runs the checks, attaches
   a zip of the static build to a GitHub release, and publishes a multi-arch image to
   `ghcr.io/devenvy/storm-watch`.
 

@@ -1,37 +1,22 @@
-name: CI
+name: Docker
 
-# main is covered by pages.yml and release.yml, which run this workflow before publishing.
+# Runs on every pull request. Pushes to main and release tags run it through pages.yml / release.yml,
+# which only publish when it passes.
 on:
-  push:
-    branches-ignore: [main]
   pull_request:
   workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # github.workflow is the caller's name when run from pages.yml / release.yml, so their gates never
+  # collide with (or get cancelled by) scheduled or manual runs.
+  group: docker-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci --no-audit --no-fund
-      - run: npm run lint
-      - run: npm run test:ci
-      - run: npm run build
-      - run: npm audit --omit=dev --audit-level=high
-
   docker:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -48,9 +33,12 @@ jobs:
           tags: stormwatch:ci
       - name: Smoke test
         run: |
-          docker run -d --name sw --read-only --tmpfs /tmp -p 8080:8080 stormwatch:ci
+          docker run -d --name sw --read-only --tmpfs /tmp --cap-drop ALL -p 8080:8080 stormwatch:ci
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/healthz && break; sleep 1; done
           curl -fsS -D - -o /dev/null http://127.0.0.1:8080/ | tee headers.txt
           grep -qi '^content-security-policy:' headers.txt
           curl -fsS http://127.0.0.1:8080/ | grep -q '<sw-root>'
           curl -fsS http://127.0.0.1:8080/ | grep -q 'http-equiv="Content-Security-Policy"'
+      - name: Container logs
+        if: failure()
+        run: docker logs sw

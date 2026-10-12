@@ -3,6 +3,7 @@ import { provideRouter } from '@angular/router';
 import { AlertsStore } from './alerts.store';
 import { dangerLabel, isDanger, NwsAlert, NwsService } from './nws.service';
 import { NhcService } from './nhc.service';
+import { AmbientService } from './ambient.service';
 import { HomeLocation, SettingsStore } from './settings.store';
 import { STORAGE_BACKEND, StorageBackend } from './storage/storage-backend';
 
@@ -72,5 +73,23 @@ describe('AlertsStore', () => {
 
     expect(store.alerts().map(a => a.id)).toEqual(['new']);
     expect(store.danger()).toEqual([]);
+  });
+
+  it('does not restart polling when home-station data arrives', async () => {
+    let alertCalls = 0;
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: STORAGE_BACKEND, useValue: new MemoryBackend() },
+        { provide: NwsService, useValue: { alertsAt: async () => { alertCalls++; return []; }, warningShapes: async () => [], latestObservation: () => new Promise(() => undefined) } },
+        { provide: NhcService, useValue: { activeStorms: async () => [] } },
+        { provide: AmbientService, useValue: { nearby: async () => [] } },
+      ],
+    });
+    const settings = TestBed.inject(SettingsStore);
+    TestBed.inject(AlertsStore);
+    settings.location.set(place(30));
+    for (let i = 0; i < 5; i++) { TestBed.tick(); await new Promise(r => setTimeout(r)); }
+    expect(alertCalls).toBe(1);
   });
 });

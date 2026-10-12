@@ -28,6 +28,8 @@ export class SettingsStore {
   readonly location = this.persist.signal<HomeLocation | null>('sw.location', null, sanitizeLocation);
   /** Jump to the default lineup channel when a danger-level alert starts. */
   readonly autoTune = this.persist.signal('sw.autoTune', true, v => (typeof v === 'boolean' ? v : null));
+  /** Ambient Weather Network station id to prefer over the nearest one (null = nearest active). */
+  readonly pws = this.persist.signal<string | null>('sw.pws', null, v => (str(v, 64) && /^[\w-]+$/.test(v) ? v : null));
   /** Audio needs a user gesture each session, so this is not persisted. */
   readonly soundArmed = signal(false);
 }

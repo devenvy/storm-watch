@@ -1,10 +1,13 @@
 import { Injectable } from '@angular/core';
 import type { Geometry } from 'geojson';
+import { miles } from '../shared/format';
 
 const NWS = 'https://api.weather.gov';
 const HEADERS = { Accept: 'application/geo+json' };
 /** Requests that hang longer than this fail, so a poll never blocks the next one forever. */
 export const FETCH_TIMEOUT_MS = 20_000;
+/** An observation older than this is skipped in favor of the next nearest station. */
+const OBS_STALE_MS = 2 * 60 * 60_000;
 
 export interface PointInfo {
   city: string;
@@ -32,6 +35,7 @@ export interface NwsAlert {
 export interface Observation {
   station: string;
   stationName: string;
+  distanceMi: number | null;
   timestamp: string;
   text: string;
   tempF: number | null;
@@ -86,7 +90,9 @@ interface PointsResponse {
 interface AlertsResponse {
   features: { properties: NwsAlert; geometry: Geometry | null }[];
 }
-interface StationsResponse { features: { properties: { stationIdentifier: string; name: string } }[] }
+interface StationsResponse {
+  features: { properties: { stationIdentifier: string; name: string }; geometry: { coordinates: [number, number] } | null }[];
+}
 interface ObservationResponse {
   properties: {
     timestamp: string; textDescription: string;
@@ -129,16 +135,37 @@ export class NwsService {
       f.geometry ? [{ event: f.properties.event, headline: f.properties.headline, geometry: f.geometry }] : []);
   }
 
-  async latestObservation(stationsUrl: string): Promise<Observation> {
+  /**
+   * Latest observation from the nearest station that is actually reporting: NWS lists stations nearest
+   * first, but the closest one can be offline (common in storms) or missing a temperature.
+   */
+  async latestObservation(stationsUrl: string, lat: number, lon: number): Promise<Observation> {
     const stations = await this.get<StationsResponse>(stationsUrl);
-    const first = stations.features[0].properties;
-    const d = await this.get<ObservationResponse>(`${NWS}/stations/${first.stationIdentifier}/observations/latest`);
+    // The list is not sorted by distance (the first entry can be 100 mi away), so sort it here.
+    const candidates = stations.features
+      .map(f => {
+        const c = f.geometry?.coordinates;
+        return { ...f.properties, distanceMi: c ? miles(lat, lon, c[1], c[0]) : Infinity };
+      })
+      .sort((a, b) => a.distanceMi - b.distanceMi)
+      .slice(0, 4);
+    let found: { s: (typeof candidates)[number]; obs: ObservationResponse } | undefined;
+    for (const s of candidates) {
+      let obs: ObservationResponse;
+      try { obs = await this.get<ObservationResponse>(`${NWS}/stations/${s.stationIdentifier}/observations/latest`); } catch { continue; }
+      found ??= { s, obs };
+      const age = Date.now() - Date.parse(obs.properties.timestamp);
+      if (age < OBS_STALE_MS && obs.properties.temperature?.value != null) { found = { s, obs }; break; }
+    }
+    if (!found) throw new Error('No NWS station near this location is reporting');
+    const { s: first, obs: d } = found;
     const p = d.properties;
     const cToF = (v: number | null | undefined) => (v == null ? null : Math.round((v * 9) / 5 + 32));
     const kmhToMph = (v: number | null | undefined) => (v == null ? null : Math.round(v * 0.621371));
     return {
       station: first.stationIdentifier,
       stationName: first.name,
+      distanceMi: Number.isFinite(first.distanceMi) ? first.distanceMi : null,
       timestamp: p.timestamp,
       text: p.textDescription,
       tempF: cToF(p.temperature?.value),

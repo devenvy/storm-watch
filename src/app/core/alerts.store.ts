@@ -1,16 +1,19 @@
-import { computed, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { dangerLabel, isDanger, NwsAlert, NwsService, Observation, WarningShape } from './nws.service';
 import { SettingsStore } from './settings.store';
 import { NhcService, Storm } from './nhc.service';
+import { AmbientService, PwsStation, STALE_MS } from './ambient.service';
 import { Persist } from './storage/persist';
 import { LineupStore } from '../iptv/lineup.store';
 
 const POLL_MS = 60_000;
 /** Tropical data changes with 3-6 hourly advisories and costs 15 requests, so poll it less often. */
 const STORM_POLL_MS = 10 * 60_000;
+/** Home weather stations upload every 1-5 minutes. */
+const PWS_POLL_MS = 2 * 60_000;
 
-export type Feed = 'alerts' | 'shapes' | 'observation' | 'storms';
+export type Feed = 'alerts' | 'shapes' | 'observation' | 'storms' | 'pws';
 
 /** Health of one feed: when it last succeeded and whether the latest attempt failed. */
 export interface FeedState {
@@ -23,6 +26,7 @@ const EMPTY: Record<Feed, FeedState> = {
   shapes: { okAt: null, error: null },
   observation: { okAt: null, error: null },
   storms: { okAt: null, error: null },
+  pws: { okAt: null, error: null },
 };
 
 /** Polls weather data for the home location and raises alarms on new danger alerts. */
@@ -30,6 +34,7 @@ const EMPTY: Record<Feed, FeedState> = {
 export class AlertsStore {
   private readonly nws = inject(NwsService);
   private readonly nhc = inject(NhcService);
+  private readonly ambient = inject(AmbientService);
   private readonly settings = inject(SettingsStore);
   private readonly lineup = inject(LineupStore);
   private readonly router = inject(Router);
@@ -39,6 +44,14 @@ export class AlertsStore {
   readonly shapes = signal<WarningShape[]>([]);
   readonly observation = signal<Observation | null>(null);
   readonly storms = signal<Storm[]>([]);
+  /** Active Ambient Weather Network stations near home, nearest first. */
+  readonly stations = signal<PwsStation[]>([]);
+  /** The pinned station when it is reporting, otherwise the nearest active one. */
+  readonly station = computed(() => {
+    const list = this.stations();
+    const pin = this.settings.pws();
+    return (pin && list.find(s => s.id === pin)) || list[0] || null;
+  });
   readonly feeds = signal<Record<Feed, FeedState>>(EMPTY);
 
   /** Time of the last successful alert check (alerts are the feed that matters most). */
@@ -46,7 +59,8 @@ export class AlertsStore {
   readonly error = computed(() => {
     const f = this.feeds();
     if (f.alerts.error) return f.alerts.okAt ? 'Alert feed unreachable, retrying (showing last good data)' : 'Alert feed unreachable, retrying';
-    const failed = (Object.keys(f) as Feed[]).filter(k => f[k].error).length;
+    // Home stations are a bonus feed; their outage is shown in the conditions card only.
+    const failed = (Object.keys(f) as Feed[]).filter(k => k !== 'pws' && f[k].error).length;
     return failed ? `${failed} feed(s) failed, retrying` : null;
   });
 
@@ -59,9 +73,11 @@ export class AlertsStore {
   private audio: AudioContext | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
   private stormsAt = 0;
+  private pwsAt = 0;
   /** Bumped on every location change; responses from an older generation are dropped. */
   private generation = 0;
-  private inFlight = false;
+  /** Feeds with a request still running; each feed has its own lock so a slow one never delays alerts. */
+  private readonly busy = new Set<Feed>();
 
   constructor() {
     // Wait for stored state (seen alerts, lineup) before the first poll so old alerts don't re-alarm.
@@ -72,27 +88,32 @@ export class AlertsStore {
       const ready = hydrated();
       clearInterval(this.timer);
       this.generation++;
-      this.inFlight = false;
+      this.busy.clear();
       this.stormsAt = 0;
+      this.pwsAt = 0;
       this.alerts.set([]);
       this.shapes.set([]);
       this.observation.set(null);
+      this.stations.set([]);
       this.feeds.set(EMPTY);
       if (!loc || !ready) return;
-      this.refresh();
+      // Untracked: refresh reads other signals (e.g. stations), which must not re-run this effect.
+      untracked(() => void this.refresh());
       this.timer = setInterval(() => this.refresh(), POLL_MS);
     });
   }
 
   async refresh(): Promise<void> {
     const loc = this.settings.location();
-    if (!loc || this.inFlight) return;
+    if (!loc) return;
     const gen = this.generation;
-    this.inFlight = true;
     const current = () => gen === this.generation;
+    this.pruneStations();
 
-    const track = <T>(feed: Feed, p: Promise<T>, apply: (v: T) => void): Promise<void> =>
-      p.then(
+    const track = <T>(feed: Feed, run: () => Promise<T>, apply: (v: T) => void): Promise<void> => {
+      if (this.busy.has(feed)) return Promise.resolve();
+      this.busy.add(feed);
+      return run().then(
         v => {
           if (!current()) return;
           apply(v);
@@ -102,18 +123,27 @@ export class AlertsStore {
           if (!current()) return;
           this.feeds.update(f => ({ ...f, [feed]: { ...f[feed], error: (e as Error)?.message ?? 'failed' } }));
         },
-      );
+      ).finally(() => { if (current()) this.busy.delete(feed); });
+    };
 
     const jobs = [
-      track('alerts', this.nws.alertsAt(loc.lat, loc.lon), a => this.onAlerts(a)),
-      track('shapes', this.nws.warningShapes(), s => this.shapes.set(s)),
-      track('observation', this.nws.latestObservation(loc.stationsUrl), o => this.observation.set(o)),
+      track('alerts', () => this.nws.alertsAt(loc.lat, loc.lon), a => this.onAlerts(a)),
+      track('shapes', () => this.nws.warningShapes(), s => this.shapes.set(s)),
+      track('observation', () => this.nws.latestObservation(loc.stationsUrl, loc.lat, loc.lon), o => this.observation.set(o)),
     ];
     if (Date.now() - this.stormsAt >= STORM_POLL_MS) {
-      jobs.push(track('storms', this.nhc.activeStorms(), s => { this.storms.set(s); this.stormsAt = Date.now(); }));
+      jobs.push(track('storms', () => this.nhc.activeStorms(), s => { this.storms.set(s); this.stormsAt = Date.now(); }));
+    }
+    if (Date.now() - this.pwsAt >= PWS_POLL_MS) {
+      jobs.push(track('pws', () => this.ambient.nearby(loc.lat, loc.lon), s => { this.stations.set(s); this.pwsAt = Date.now(); }));
     }
     await Promise.all(jobs);
-    if (current()) this.inFlight = false;
+  }
+
+  /** Drop home-station readings that have gone stale, e.g. while the Ambient feed is unreachable. */
+  private pruneStations(): void {
+    const cutoff = Date.now() - STALE_MS;
+    if (this.stations().some(s => s.at < cutoff)) this.stations.update(list => list.filter(s => s.at >= cutoff));
   }
 
   private onAlerts(alerts: NwsAlert[]): void {

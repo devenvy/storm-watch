@@ -13,12 +13,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Full CI (lint, tests, audit, Docker smoke test) must pass before anything is published.
-  ci:
-    uses: ./.github/workflows/ci.yml
+  # Each check is its own workflow so it passes or fails on its own; all must pass before publishing.
+  lint:
+    uses: ./.github/workflows/lint.yml
+  test:
+    uses: ./.github/workflows/test.yml
+  audit:
+    uses: ./.github/workflows/audit.yml
+  docker:
+    uses: ./.github/workflows/docker.yml
 
   build:
-    needs: ci
+    needs: [lint, test, audit, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
