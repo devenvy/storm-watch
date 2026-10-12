@@ -1,14 +1,37 @@
 version: 2
+
+# One weekly pull request for everything (npm, GitHub Actions, Docker base images).
+# Major versions are left out so that PR stays green: they usually need code changes or are blocked by
+# Angular's supported ranges (e.g. Angular 22 requires TypeScript 6.0.x), and odd Node.js majors never
+# become LTS. Do major upgrades by hand (`ng update` for Angular).
+multi-ecosystem-groups:
+  dependencies:
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies]
+
 updates:
   - package-ecosystem: npm
     directory: /
-    schedule: { interval: weekly }
-    groups:
-      angular:
-        patterns: ['@angular/*', '@angular-devkit/*', 'angular-eslint', '@angular-eslint/*']
+    patterns: ['*']
+    multi-ecosystem-group: dependencies
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    patterns: ['*']
+    multi-ecosystem-group: dependencies
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+
   - package-ecosystem: docker
     directory: /
-    schedule: { interval: weekly }
+    patterns: ['*']
+    multi-ecosystem-group: dependencies
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]

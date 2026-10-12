@@ -162,6 +162,10 @@ swapped (e.g. for a server-backed store) without touching features.
   `lint.yml`, `test.yml`, `build.yml` (production build and size budgets), `audit.yml` (`npm audit` of
   runtime dependencies, also weekly) and `docker.yml` (image build plus a smoke test of the container and its
   security headers).
+- **CodeQL** (`codeql.yml`): security analysis of the TypeScript and the workflows on pull requests, `main`
+  and weekly.
+- **Dependabot**: one grouped pull request a week for npm, GitHub Actions and Docker updates (major
+  versions are upgraded by hand).
 - **Pages** (`pages.yml`): every push to `main` runs the checks and, when they pass, deploys to GitHub Pages (Settings → Pages → Source: GitHub
   Actions).
 - **Release** (`release.yml`): pushing a tag `vX.Y.Z` (or `vX.Y.Z-beta.N` for a pre-release) runs the checks, attaches
