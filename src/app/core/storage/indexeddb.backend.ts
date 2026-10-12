@@ -8,7 +8,7 @@ const STORE = 'kv';
 async function req<T>(r: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
+    r.onerror = () => reject(r.error ?? new Error('IndexedDB request failed'));
   });
 }
 
@@ -25,7 +25,7 @@ export class IndexedDbBackend implements StorageBackend {
     try {
       const r = indexedDB.open(DB, 1);
       r.onupgradeneeded = () => r.result.createObjectStore(STORE);
-      return req(r).catch(() => null);
+      return await req(r).catch(() => null);
     } catch {
       return Promise.resolve(null);
     }
@@ -45,7 +45,9 @@ export class IndexedDbBackend implements StorageBackend {
     const t = store.transaction;
     await new Promise<void>((resolve, reject) => {
       t.oncomplete = () => resolve();
-      t.onabort = t.onerror = () => reject(t.error ?? new Error('IndexedDB write aborted'));
+      const fail = () => reject(t.error ?? new Error('IndexedDB write aborted'));
+      t.onabort = fail;
+      t.onerror = fail;
       op(store);
     });
     return true;
@@ -56,7 +58,7 @@ export class IndexedDbBackend implements StorageBackend {
     if (!store) {
       return this.legacy.get<T>(key);
     }
-    const value = await req(store.get(key)).catch(() => undefined);
+    const value = await req<unknown>(store.get(key)).catch(() => undefined);
     if (value !== undefined) {
       return value as T;
     }
@@ -75,13 +77,13 @@ export class IndexedDbBackend implements StorageBackend {
 
   async set<T>(key: string, value: T): Promise<void> {
     if (!(await this.write((s) => s.put(value, key)))) {
-      return this.legacy.set(key, value);
+      await this.legacy.set(key, value);
     }
   }
 
   async remove(key: string): Promise<void> {
     if (!(await this.write((s) => s.delete(key)))) {
-      return this.legacy.remove(key);
+      await this.legacy.remove(key);
     }
   }
 }

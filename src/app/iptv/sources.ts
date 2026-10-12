@@ -2,6 +2,20 @@ import type { Channel, M3uSource, XtreamSource } from './models';
 
 export class SourceError extends Error {}
 
+const MS_PER_SECOND = 1000;
+/** FNV-1a 32-bit parameters. */
+const FNV_OFFSET_BASIS = 2166136261;
+const FNV_PRIME = 16777619;
+const KEY_RADIX = 36;
+
+/** Providers send '' (or nothing) for a missing value; both mean "none". */
+function orUndefined(s: string | null | undefined): string | undefined {
+  if (!s) {
+    return undefined;
+  }
+  return s;
+}
+
 /**
  * Fetch with a diagnosis of the usual browser failures, since a bare TypeError
  * ("Failed to fetch") tells the user nothing.
@@ -48,22 +62,35 @@ export interface XtreamAccount {
   expires: Date | null;
 }
 
+/** `player_api.php` login response; providers vary, so numbers may arrive as strings. */
+interface XtreamUserInfo {
+  auth?: number;
+  status: string;
+  max_connections?: string | number;
+  active_cons?: string | number;
+  allowed_output_formats?: string[];
+  exp_date?: string | number | null;
+}
+interface XtreamLoginResponse {
+  user_info?: XtreamUserInfo | null;
+}
+
 export async function xtreamLogin(s: XtreamSource): Promise<XtreamAccount> {
   const r = await diagnosedFetch(apiUrl(s));
   if (!r.ok) {
     throw new SourceError(`Login failed: HTTP ${r.status}`);
   }
-  const d = await r.json();
+  const d = (await r.json()) as XtreamLoginResponse;
   const u = d.user_info;
   if (!u || u.auth === 0) {
     throw new SourceError('Login rejected: check username and password.');
   }
   return {
     status: u.status,
-    maxConnections: +u.max_connections,
-    activeConnections: +u.active_cons,
+    maxConnections: Number(u.max_connections),
+    activeConnections: Number(u.active_cons),
     formats: u.allowed_output_formats ?? ['ts'],
-    expires: u.exp_date ? new Date(+u.exp_date * 1000) : null,
+    expires: u.exp_date ? new Date(Number(u.exp_date) * MS_PER_SECOND) : null,
   };
 }
 
@@ -73,10 +100,10 @@ interface XtreamCategory {
 }
 interface XtreamStream {
   stream_id: number;
-  name?: string;
-  stream_icon?: string;
+  name?: string | number | null;
+  stream_icon?: string | null;
   category_id?: string | number;
-  epg_channel_id?: string;
+  epg_channel_id?: string | null;
 }
 
 export async function xtreamChannels(s: XtreamSource): Promise<Channel[]> {
@@ -97,9 +124,9 @@ export async function xtreamChannels(s: XtreamSource): Promise<Channel[]> {
     key: `x${st.stream_id}`,
     name: String(st.name ?? '').trim(),
     url: `${base(s)}/live/${user}/${pass}/${st.stream_id}.${s.format}`,
-    logo: st.stream_icon || undefined,
+    logo: orUndefined(st.stream_icon),
     category: catName.get(String(st.category_id)),
-    epgId: st.epg_channel_id || undefined,
+    epgId: orUndefined(st.epg_channel_id),
     streamId: st.stream_id,
   }));
 }
@@ -119,12 +146,24 @@ export interface NowPlaying {
   end: Date;
 }
 
+interface XtreamEpgListing {
+  /** Base64-encoded UTF-8. */
+  title?: string;
+  /** Base64-encoded UTF-8. */
+  description?: string;
+  start_timestamp: string | number;
+  stop_timestamp: string | number;
+}
+interface XtreamShortEpg {
+  epg_listings?: XtreamEpgListing[];
+}
+
 export async function xtreamNowPlaying(
   s: XtreamSource,
   streamId: number,
 ): Promise<NowPlaying | null> {
   const r = await fetch(apiUrl(s, 'get_short_epg', `&stream_id=${streamId}&limit=1`));
-  const d = await r.json();
+  const d = (await r.json()) as XtreamShortEpg;
   const e = d.epg_listings?.[0];
   if (!e) {
     return null;
@@ -132,8 +171,8 @@ export async function xtreamNowPlaying(
   return {
     title: b64utf8(e.title ?? ''),
     description: b64utf8(e.description ?? ''),
-    start: new Date(+e.start_timestamp * 1000),
-    end: new Date(+e.stop_timestamp * 1000),
+    start: new Date(Number(e.start_timestamp) * MS_PER_SECOND),
+    end: new Date(Number(e.stop_timestamp) * MS_PER_SECOND),
   };
 }
 
@@ -148,38 +187,43 @@ export async function m3uChannels(s: M3uSource): Promise<Channel[]> {
 export function parseM3u(text: string): Channel[] {
   const out: Channel[] = [];
   const lines = text.split(/\r?\n/);
+  /** Blank lines and other directives between #EXTINF and its URL. */
+  const skippable = (line: string | undefined) =>
+    line !== undefined && (!line.trim() || line.startsWith('#'));
   for (let i = 0; i < lines.length; i++) {
-    const info = lines[i];
-    if (!info.startsWith('#EXTINF')) {
-      continue;
+    const info = lines[i] ?? '';
+    if (info.startsWith('#EXTINF')) {
+      let j = i + 1;
+      while (skippable(lines[j])) {
+        j++;
+      }
+      const url = lines[j]?.trim();
+      if (url) {
+        const attr = (name: string) =>
+          orUndefined(info.match(new RegExp(`${name}="([^"]*)"`))?.[1]);
+        const comma = info.indexOf(',', info.lastIndexOf('"') + 1);
+        out.push({
+          key: `m${hash(url)}`,
+          name: (comma >= 0 ? info.slice(comma + 1) : (attr('tvg-name') ?? url)).trim(),
+          url,
+          logo: attr('tvg-logo'),
+          category: attr('group-title'),
+          epgId: attr('tvg-id'),
+        });
+        i = j;
+      }
     }
-    let j = i + 1;
-    while (j < lines.length && (!lines[j].trim() || lines[j].startsWith('#'))) {
-      j++;
-    }
-    const url = lines[j]?.trim();
-    if (!url) {
-      continue;
-    }
-    const attr = (name: string) => info.match(new RegExp(`${name}="([^"]*)"`))?.[1] || undefined;
-    const comma = info.indexOf(',', info.lastIndexOf('"') + 1);
-    out.push({
-      key: `m${hash(url)}`,
-      name: (comma >= 0 ? info.slice(comma + 1) : (attr('tvg-name') ?? url)).trim(),
-      url,
-      logo: attr('tvg-logo'),
-      category: attr('group-title'),
-      epgId: attr('tvg-id'),
-    });
-    i = j;
   }
   return out;
 }
 
+/** FNV-1a; the result is a persisted channel key, so the algorithm must never change. */
 function hash(s: string): string {
-  let h = 2166136261;
+  let h = FNV_OFFSET_BASIS;
   for (let i = 0; i < s.length; i++) {
-    h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    // eslint-disable-next-line no-bitwise -- FNV-1a is defined in terms of XOR
+    h = Math.imul(h ^ s.charCodeAt(i), FNV_PRIME);
   }
-  return (h >>> 0).toString(36);
+  // eslint-disable-next-line no-bitwise -- reinterpret the signed 32-bit result as unsigned
+  return (h >>> 0).toString(KEY_RADIX);
 }

@@ -94,6 +94,25 @@ const STATES: Record<string, string> = {
   DC: 'District of Columbia',
 };
 
+/** Minimum city-name length worth matching; shorter names give false positives. */
+const MIN_CITY_LENGTH = 3;
+
+/** Points added (or subtracted) for each signal in {@link scoreChannel}. */
+const WEIGHTS = {
+  city: 60,
+  state: 20,
+  weatherName: 55,
+  weatherCategory: 30,
+  newsName: 20,
+  newsCategory: 15,
+  localCategory: 20,
+  callSign: 10,
+  network: 5,
+  ownCountry: 10,
+  otherCountryPenalty: 50,
+  junkPenalty: 35,
+};
+
 function countryOf(text: string): string | null {
   const tag = text.match(COUNTRY_TAG)?.[1];
   if (!tag) {
@@ -122,42 +141,45 @@ export function scoreChannel(ch: Channel, ctx: ScoreContext): Suggestion {
     reasons.push(why);
   };
 
-  if (ctx.city.length >= 3 && new RegExp(`\\b${escapeRe(ctx.city)}\\b`, 'i').test(both)) {
-    add(60, `Mentions ${ctx.city}`);
+  if (
+    ctx.city.length >= MIN_CITY_LENGTH &&
+    new RegExp(`\\b${escapeRe(ctx.city)}\\b`, 'i').test(both)
+  ) {
+    add(WEIGHTS.city, `Mentions ${ctx.city}`);
   }
   const stateName = STATES[ctx.state];
   if (stateName && new RegExp(`\\b${escapeRe(stateName)}\\b`, 'i').test(both)) {
-    add(20, `Mentions ${stateName}`);
+    add(WEIGHTS.state, `Mentions ${stateName}`);
   }
   if (WEATHER.test(name)) {
-    add(55, 'Weather channel');
+    add(WEIGHTS.weatherName, 'Weather channel');
   } else if (WEATHER.test(cat)) {
-    add(30, 'Weather category');
+    add(WEIGHTS.weatherCategory, 'Weather category');
   }
   if (NEWS.test(name)) {
-    add(20, 'News channel');
+    add(WEIGHTS.newsName, 'News channel');
   } else if (NEWS.test(cat)) {
-    add(15, 'News category');
+    add(WEIGHTS.newsCategory, 'News category');
   }
   if (LOCAL.test(cat)) {
-    add(20, 'Local category');
+    add(WEIGHTS.localCategory, 'Local category');
   }
   if (ctx.country === 'US' && CALLSIGN.test(name)) {
-    add(10, 'US station call sign');
+    add(WEIGHTS.callSign, 'US station call sign');
   }
   if (NETWORK.test(name)) {
-    add(5, 'Broadcast network');
+    add(WEIGHTS.network, 'Broadcast network');
   }
 
   const tagged = countryOf(name) ?? countryOf(cat);
   if (tagged && tagged === ctx.country) {
-    add(10, 'Your country');
+    add(WEIGHTS.ownCountry, 'Your country');
   } else if (tagged) {
-    score -= 50;
+    score -= WEIGHTS.otherCountryPenalty;
     reasons.push(`Other country (${tagged})`);
   }
   if (JUNK.test(both)) {
-    score -= 35;
+    score -= WEIGHTS.junkPenalty;
     reasons.push('Likely not live news');
   }
 

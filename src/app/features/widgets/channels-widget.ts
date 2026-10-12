@@ -36,43 +36,7 @@ import { CardButtons, Expandable } from '../../shared/expandable';
       }
     </div>
   `,
-  styles: `
-    .tiles {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 6px;
-      align-content: start;
-    }
-    .tile {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px;
-      background: var(--bg);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      color: var(--fg);
-      text-decoration: none;
-    }
-    .tile:hover,
-    .tile:focus {
-      border-color: var(--blue);
-    }
-    .tile.on {
-      border-color: var(--blue);
-      background: #1f3a5f;
-    }
-    .tile span {
-      min-width: 0;
-      overflow-wrap: anywhere;
-    }
-    .tile small {
-      color: var(--muted);
-    }
-    :host(.card-expanded) .tiles {
-      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    }
-  `,
+  styleUrl: './channels-widget.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'panel widget' },
   hostDirectives: [Expandable],

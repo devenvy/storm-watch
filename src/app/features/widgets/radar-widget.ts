@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  model,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, model } from '@angular/core';
 
 import { AlertsStore } from '../../core/alerts.store';
 import { RADAR_SOURCES, type RadarSourceId } from '../../core/radar-sources';
@@ -39,27 +31,7 @@ import type { HomeLocation } from '../../core/settings.store';
       <img class="site" alt="Local single-site radar loop" [src]="loop()" />
     }
   `,
-  styles: `
-    sw-radar-map {
-      flex: 1;
-      min-height: 0;
-    }
-    .site {
-      flex: 1;
-      min-height: 0;
-      width: 100%;
-      object-fit: contain;
-      background: #000;
-      border-radius: 6px;
-    }
-    .src {
-      padding: 2px 6px;
-      font-size: 12px;
-      text-transform: none;
-      letter-spacing: 0;
-      max-width: 60%;
-    }
-  `,
+  styleUrl: './radar-widget.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'panel widget' },
   hostDirectives: [Expandable],

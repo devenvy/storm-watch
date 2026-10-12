@@ -30,11 +30,13 @@ export interface ShareOptions {
 
 const MAX_ENCODED = 64_000;
 const MAX_JSON = 512_000;
+/** Bytes per String.fromCharCode call, kept well under engine argument-count limits. */
+const BASE64_CHUNK_BYTES = 0x8000;
 
 function toBase64Url(bytes: Uint8Array): string {
   let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_BYTES) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_BYTES));
   }
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/[=]+$/, '');
 }
@@ -52,7 +54,7 @@ async function pipe(
 ): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
   // Not awaited: the readable side must be drained concurrently or large inputs stall.
-  void writer
+  writer
     .write(bytes as Uint8Array<ArrayBuffer>)
     .then(async () => writer.close())
     .catch(() => undefined);
@@ -139,7 +141,7 @@ export class ShareService {
   /** Applies a share link. Asks first if it would overwrite a different existing setup. */
   async apply(encoded: string): Promise<boolean> {
     await this.persist.ready();
-    const raw = (await decodePayload(encoded)) as Partial<SharePayload>;
+    const raw = (await decodePayload(encoded)) as Partial<SharePayload> | null;
     if (raw?.app !== 'stormwatch' || raw.v !== 1) {
       throw new Error('Not a Storm Watch share link.');
     }
@@ -157,6 +159,7 @@ export class ShareService {
         source && 'IPTV login + channels',
       ].filter(Boolean);
       if (
+        // eslint-disable-next-line no-alert -- deliberate blocking confirmation before overwriting the device setup; no in-app dialog exists for this flow
         !confirm(
           `Apply this shared Storm Watch setup? It replaces your ${parts.join(', ')} on this device.`,
         )
@@ -180,7 +183,11 @@ export class ShareService {
         this.lineup.lineup.set(lineup);
       }
       // Re-poll the provider so channel URLs and logos are current.
-      void this.lineup.loadCatalog();
+      this.lineup
+        .loadCatalog()
+        .catch((e: unknown) =>
+          console.error('Storm Watch: could not reload the channel catalog', e),
+        );
     }
     this.lastApplied.set(encoded);
     return true;

@@ -1,0 +1,37 @@
+.screen {
+  flex: 1;
+  min-height: 0;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.screen sw-player {
+  width: 100%;
+  height: 100%;
+}
+.screen p {
+  margin: 0;
+  padding: 8px;
+  text-align: center;
+}
+.pstat {
+  font-size: 11px;
+}
+.pstat.error {
+  color: var(--red);
+}
+.pstat.playing {
+  color: var(--green);
+}
+.pstat.reconnecting {
+  color: var(--yellow);
+}
+.icon {
+  text-decoration: none;
+  font-size: 14px;
+  padding: 0 4px;
+  background: none;
+  border: 0;
+}

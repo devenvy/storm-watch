@@ -47,7 +47,7 @@ export class Persist {
       value === null || value === undefined
         ? this.backend.remove(key)
         : this.backend.set(key, value);
-    op.catch((e) => console.warn(`Storm Watch: could not save "${key}"`, e));
+    op.catch((e: unknown) => console.warn(`Storm Watch: could not save "${key}"`, e));
   }
 
   /** Resolves once every signal created so far has loaded its stored value. */

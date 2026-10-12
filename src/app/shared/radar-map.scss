@@ -1,0 +1,157 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mapwrap {
+  flex: 1;
+  min-height: 220px;
+  position: relative;
+}
+.map {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  background: #111;
+}
+:host ::ng-deep .basemap {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.4);
+}
+.badge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: #6e40c9;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+.badge.loading {
+  background: #21262d;
+  top: auto;
+  bottom: 8px;
+}
+.badge.err {
+  background: var(--red);
+  top: auto;
+  bottom: 8px;
+}
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.controls {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.controls button {
+  padding: 4px 9px;
+  min-width: 34px;
+}
+.play {
+  border-color: var(--blue);
+}
+.time {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.time b {
+  font-size: 18px;
+}
+.time small {
+  color: var(--muted);
+}
+.time.future b,
+.time.future small {
+  color: #b392f0;
+}
+.controls select {
+  margin-left: auto;
+  padding: 4px 6px;
+}
+.track {
+  position: relative;
+}
+.track input {
+  width: 100%;
+  accent-color: var(--blue);
+  position: relative;
+}
+.nowline {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  background: var(--yellow);
+  pointer-events: none;
+  margin-left: 7px;
+}
+.ticks {
+  position: relative;
+  height: 16px;
+  margin: 0 7px;
+}
+.tick {
+  position: absolute;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tick.future {
+  color: #8b72c9;
+}
+.tick.on {
+  color: var(--fg);
+  font-weight: 700;
+}
+.legend {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.legend .tor {
+  background: #ff2d2d;
+}
+.legend .svr {
+  background: #ff9f1a;
+}
+.legend .ffw {
+  background: #2ecc71;
+}
+.legend .ewx {
+  background: #ff4fd8;
+}
+.note {
+  color: #b392f0;
+}
+.link {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 12px;
+}

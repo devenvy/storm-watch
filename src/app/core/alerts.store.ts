@@ -17,9 +17,16 @@ import { LineupStore } from '../iptv/lineup.store';
 
 const POLL_MS = 60_000;
 /** Tropical data changes with 3-6 hourly advisories and costs 15 requests, so poll it less often. */
-const STORM_POLL_MS = 10 * 60_000;
+const STORM_POLL_MS = 600_000; // 10 minutes
 /** Home weather stations upload every 1-5 minutes. */
-const PWS_POLL_MS = 2 * 60_000;
+const PWS_POLL_MS = 120_000; // 2 minutes
+/** How many announced alert ids to remember. */
+const SEEN_MAX = 300;
+/** Beeps for a new danger alert (vs. one for an ordinary new alert). */
+const DANGER_BEEPS = 6;
+/** EAS-style two-tone beep: alternating tones, each `toneS` long, one every `periodS`. */
+const BEEP = { highHz: 960, lowHz: 853, gain: 0.35, toneS: 0.45, periodS: 0.5 };
+const BEEP_TONES = 2;
 
 export type Feed = 'alerts' | 'shapes' | 'observation' | 'storms' | 'pws';
 
@@ -58,7 +65,7 @@ export class AlertsStore {
   readonly station = computed(() => {
     const list = this.stations();
     const pin = this.settings.pws();
-    return (pin && list.find((s) => s.id === pin)) || list[0] || null;
+    return (pin ? list.find((s) => s.id === pin) : undefined) ?? list[0] ?? null;
   });
   readonly feeds = signal<Record<Feed, FeedState>>(EMPTY);
 
@@ -81,7 +88,7 @@ export class AlertsStore {
 
   /** Alert ids already announced, so reloads don't re-beep old alerts. */
   private readonly seen = this.persist.signal<string[]>('sw.seenAlerts', [], (v) =>
-    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-300) : null,
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(-SEEN_MAX) : null,
   );
   private audio: AudioContext | null = null;
   private timer: ReturnType<typeof setInterval> | undefined;
@@ -95,7 +102,10 @@ export class AlertsStore {
   constructor() {
     // Wait for stored state (seen alerts, lineup) before the first poll so old alerts don't re-alarm.
     const hydrated = signal(false);
-    this.persist.ready().then(() => hydrated.set(true));
+    this.persist
+      .ready()
+      .then(() => hydrated.set(true))
+      .catch((e: unknown) => console.error('Storm Watch: storage hydration failed', e));
     effect(() => {
       const loc = this.settings.location();
       const ready = hydrated();
@@ -113,7 +123,9 @@ export class AlertsStore {
         return;
       }
       // Untracked: refresh reads other signals (e.g. stations), which must not re-run this effect.
-      untracked(() => void this.refresh());
+      untracked(() => {
+        this.refresh().catch((e: unknown) => console.error('Storm Watch: refresh failed', e));
+      });
       this.timer = setInterval(async () => this.refresh(), POLL_MS);
     });
   }
@@ -151,7 +163,10 @@ export class AlertsStore {
             }
             this.feeds.update((f) => ({
               ...f,
-              [feed]: { ...f[feed], error: (e as Error)?.message ?? 'failed' },
+              [feed]: {
+                ...f[feed],
+                error: (e as Partial<Error> | null | undefined)?.message ?? 'failed',
+              },
             }));
           },
         )
@@ -220,31 +235,39 @@ export class AlertsStore {
     const seen = new Set(this.seen());
     const fresh = alerts.filter((a) => !seen.has(a.id));
     if (fresh.length) {
-      this.seen.set([...seen, ...fresh.map((a) => a.id)].slice(-300));
+      this.seen.set([...seen, ...fresh.map((a) => a.id)].slice(-SEEN_MAX));
     }
 
     const freshDanger = fresh.filter(isDanger);
     if (freshDanger.length) {
-      this.beep(6);
-      freshDanger.forEach((a) => this.notify(dangerLabel(a), a.headline));
+      this.beep(DANGER_BEEPS);
+      for (const a of freshDanger) {
+        notify(dangerLabel(a), a.headline);
+      }
       const def = this.lineup.defaultChannel();
       // Stay on the Watch page or current dashboard if already there; otherwise open the first dashboard.
       // Existing query params (kiosk) are kept.
       if (this.settings.autoTune() && def) {
-        const path = this.router.url.split('?')[0];
+        const path = this.router.url.split('?')[0] ?? '';
         if (path.startsWith('/watch')) {
-          this.router.navigate(['/watch', def.key], { queryParamsHandling: 'preserve' });
+          this.router
+            .navigate(['/watch', def.key], { queryParamsHandling: 'preserve' })
+            .catch((e: unknown) => console.error('Storm Watch: auto-tune navigation failed', e));
         } else {
           const commands = path === '/' || path.startsWith('/d/') ? [] : ['/'];
-          this.router.navigate(commands, {
-            queryParams: { ch: def.key },
-            queryParamsHandling: 'merge',
-          });
+          this.router
+            .navigate(commands, {
+              queryParams: { ch: def.key },
+              queryParamsHandling: 'merge',
+            })
+            .catch((e: unknown) => console.error('Storm Watch: auto-tune navigation failed', e));
         }
       }
     } else if (fresh.length && !firstLoad) {
       this.beep(1);
-      fresh.forEach((a) => this.notify(`New alert: ${a.event}`, a.headline));
+      for (const a of fresh) {
+        notify(`New alert: ${a.event}`, a.headline);
+      }
     }
   }
 
@@ -271,23 +294,25 @@ export class AlertsStore {
     for (let i = 0; i < n; i++) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.frequency.value = i % 2 ? 853 : 960; // EAS-style two-tone
+      osc.frequency.value = i % BEEP_TONES ? BEEP.lowHz : BEEP.highHz; // EAS-style two-tone
       osc.connect(gain).connect(ctx.destination);
-      const t = ctx.currentTime + i * 0.5;
-      gain.gain.setValueAtTime(0.35, t);
-      gain.gain.setValueAtTime(0, t + 0.45);
+      const t = ctx.currentTime + i * BEEP.periodS;
+      gain.gain.setValueAtTime(BEEP.gain, t);
+      gain.gain.setValueAtTime(0, t + BEEP.toneS);
       osc.start(t);
-      osc.stop(t + 0.5);
+      osc.stop(t + BEEP.periodS);
     }
   }
+}
 
-  private notify(title: string, body: string): void {
-    try {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body, requireInteraction: true });
-      }
-    } catch {
-      /* some mobile browsers require a service worker */
+/** Shows a desktop notification when permitted; returns it, or null when none was shown. */
+function notify(title: string, body: string): Notification | null {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      return new Notification(title, { body, requireInteraction: true });
     }
+  } catch {
+    /* some mobile browsers require a service worker */
   }
+  return null;
 }

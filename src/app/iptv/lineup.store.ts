@@ -6,6 +6,15 @@ import { Persist } from '../core/storage/persist';
 
 import type { Channel, Lineup, Source } from './models';
 
+const JSON_INDENT = 2;
+
+/** Shape of an exported lineup file; every field is untrusted until sanitized. */
+interface ExportFile {
+  app?: unknown;
+  source?: unknown;
+  lineup?: unknown;
+}
+
 /**
  * The saved source and the user's "storm lineup": a small, pre-curated channel list
  * kept on-device so it opens instantly with no login or catalog download.
@@ -96,7 +105,6 @@ export class LineupStore {
   private refreshLineup(catalog: Channel[]): void {
     const byKey = new Map(catalog.map((c) => [c.key, c]));
     this.lineup.update((l) => {
-      let changed = false;
       const channels = l.channels.map((c) => {
         const fresh = byKey.get(c.key);
         if (
@@ -106,9 +114,9 @@ export class LineupStore {
         ) {
           return c;
         }
-        changed = true;
         return { ...c, url: fresh.url, logo: fresh.logo };
       });
+      const changed = channels.some((c, i) => c !== l.channels[i]);
       return changed ? { ...l, channels } : l;
     });
   }
@@ -145,10 +153,14 @@ export class LineupStore {
       const list = [...l.channels];
       const i = list.findIndex((c) => c.key === key);
       const j = i + delta;
-      if (i < 0 || j < 0 || j >= list.length) {
+      const a = list[i];
+      const b = list[j];
+      // Either end out of range (including an unknown key) leaves the order unchanged.
+      if (!a || !b) {
         return l;
       }
-      [list[i], list[j]] = [list[j], list[i]];
+      list[i] = b;
+      list[j] = a;
       return { ...l, channels: list };
     });
   }
@@ -171,21 +183,22 @@ export class LineupStore {
       return null;
     }
     const i = list.findIndex((c) => c.key === key);
-    return list[((((i < 0 ? 0 : i) + delta) % list.length) + list.length) % list.length];
+    return list[((((i < 0 ? 0 : i) + delta) % list.length) + list.length) % list.length] ?? null;
   }
 
   exportJson(): string {
     return JSON.stringify(
       { app: 'stormwatch', source: this.source(), lineup: this.lineup() },
       null,
-      2,
+      JSON_INDENT,
     );
   }
 
   importJson(text: string): void {
-    const d = JSON.parse(text);
+    const parsed: unknown = JSON.parse(text);
+    const d = typeof parsed === 'object' && parsed !== null ? (parsed as ExportFile) : null;
     const lineup = d?.app === 'stormwatch' ? sanitizeLineup(d.lineup) : null;
-    if (!lineup) {
+    if (!d || !lineup) {
       throw new Error('Not a Storm Watch export.');
     }
     this.source.set(sanitizeSource(d.source));

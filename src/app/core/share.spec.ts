@@ -42,6 +42,7 @@ describe('share links', () => {
   });
 
   it('only accepts http(s) URLs for IPTV sources and channels', () => {
+    // eslint-disable-next-line no-script-url -- test input: verifies javascript: URLs are rejected
     expect(sanitizeSource({ kind: 'm3u', url: 'javascript:alert(1)' })).toBeNull();
     expect(
       sanitizeSource({
@@ -79,11 +80,11 @@ describe('share links', () => {
       },
     ]);
     expect(boards).toHaveLength(1);
-    expect(boards![0].id).toBe('my-board');
-    expect(boards![0].rows).toBe(12);
-    expect(boards![0].widgets).toHaveLength(1);
-    expect(boards![0].widgets[0]).toMatchObject({ type: 'radar', w: 12, h: 2 });
-    expect(boards![0].widgets[0].source).toBeUndefined();
+    expect(boards![0]!.id).toBe('my-board');
+    expect(boards![0]!.rows).toBe(12);
+    expect(boards![0]!.widgets).toHaveLength(1);
+    expect(boards![0]!.widgets[0]).toMatchObject({ type: 'radar', w: 12, h: 2 });
+    expect(boards![0]!.widgets[0]!.source).toBeUndefined();
     expect(sanitizeBoards('nope')).toBeNull();
   });
 });

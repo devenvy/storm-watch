@@ -59,57 +59,7 @@ import { compass, ktToMph } from '../../shared/format';
       }
     </div>
   `,
-  styles: `
-    .list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .storm {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      color: var(--fg);
-      text-decoration: none;
-    }
-    .storm img {
-      width: 120px;
-      height: 80px;
-      object-fit: cover;
-      border-radius: 4px;
-      background: #000;
-      flex: none;
-    }
-    .storm span {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-    }
-    .storm small {
-      color: var(--muted);
-    }
-    .err {
-      color: var(--red);
-      margin: 0;
-    }
-    .small {
-      font-size: 12px;
-      margin: 0;
-    }
-    :host(.card-expanded) .storm {
-      flex-direction: column;
-      align-items: stretch;
-      flex: 1;
-      min-height: 0;
-    }
-    :host(.card-expanded) .storm img {
-      width: 100%;
-      height: auto;
-      flex: 1;
-      min-height: 0;
-      object-fit: contain;
-    }
-  `,
+  styleUrl: './tropical-widget.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'panel widget' },
   hostDirectives: [Expandable],

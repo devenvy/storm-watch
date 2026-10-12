@@ -6,6 +6,9 @@ import { AlertsStore } from './core/alerts.store';
 import { SettingsStore } from './core/settings.store';
 import { ShareService } from './core/share';
 
+const CLOCK_TICK_MS = 1000;
+const NOTICE_DURATION_MS = 6000;
+
 @Component({
   selector: 'sw-root',
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
@@ -28,7 +31,7 @@ export class App {
   protected readonly onBoard = signal(true);
 
   constructor() {
-    const tick = setInterval(() => this.clock.set(new Date()), 1000);
+    const tick = setInterval(() => this.clock.set(new Date()), CLOCK_TICK_MS);
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
 
     this.router.events.pipe(takeUntilDestroyed()).subscribe((e) => {
@@ -36,14 +39,16 @@ export class App {
         return;
       }
       const tree = this.router.parseUrl(this.router.url);
-      const path = this.router.url.split(/[?#]/)[0];
+      const path = this.router.url.split(/[?#]/)[0] ?? '';
       this.onBoard.set(path === '/' || path.startsWith('/d/'));
       const params = tree.queryParamMap;
       const k = params.get('kiosk');
       this.kiosk.set(k !== null && k !== '0' && k !== 'false');
       const cfg = params.get('cfg');
       if (cfg) {
-        void this.applyShare(cfg);
+        this.applyShare(cfg).catch((err: unknown) => {
+          console.error('Could not apply share link', err);
+        });
       }
     });
   }
@@ -63,6 +68,6 @@ export class App {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
-    setTimeout(() => this.notice.set(null), 6000);
+    setTimeout(() => this.notice.set(null), NOTICE_DURATION_MS);
   }
 }

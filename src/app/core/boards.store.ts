@@ -40,13 +40,26 @@ export interface Board {
 export const GRID_COLS = 12;
 export const MAX_ROWS = 12;
 
-const uid = () => Math.random().toString(36).slice(2, 9);
-const w = (
-  type: WidgetType,
-  width: number,
-  height: number,
-  extra: Partial<Widget> = {},
-): Widget => ({ id: uid(), type, w: width, h: height, ...extra });
+/** Limits applied to untrusted board data. */
+const MAX_BOARDS = 20;
+const MAX_WIDGETS = 30;
+const MAX_NAME_LENGTH = 40;
+const MAX_SLUG_LENGTH = 30;
+const MAX_CHANNEL_LENGTH = 100;
+const DEFAULT_ROWS = 6;
+/** Size given to a stored widget whose size is missing or invalid. */
+const DEFAULT_SIZE = { w: 4, h: 2 };
+
+/** Random ids: base-36 digits of Math.random(), skipping the leading "0.". */
+const UID_RADIX = 36;
+const UID_START = 2;
+const UID_LENGTH = 7;
+
+const uid = () =>
+  Math.random()
+    .toString(UID_RADIX)
+    .slice(UID_START, UID_START + UID_LENGTH);
+const w = (spec: Omit<Widget, 'id'>): Widget => ({ id: uid(), ...spec });
 
 export function defaultBoards(): Board[] {
   return [
@@ -55,30 +68,33 @@ export function defaultBoards(): Board[] {
       name: 'Storm',
       rows: 6,
       widgets: [
-        w('radar', 5, 6, { source: 'blend' }),
-        w('player', 4, 3),
-        w('alerts', 3, 4),
-        w('channels', 4, 3),
-        w('conditions', 3, 1),
-        w('tropical', 3, 1),
+        w({ type: 'radar', w: 5, h: 6, source: 'blend' }),
+        w({ type: 'player', w: 4, h: 3 }),
+        w({ type: 'alerts', w: 3, h: 4 }),
+        w({ type: 'channels', w: 4, h: 3 }),
+        w({ type: 'conditions', w: 3, h: 1 }),
+        w({ type: 'tropical', w: 3, h: 1 }),
       ],
     },
     {
       id: 'radar',
       name: 'Radar',
       rows: 6,
-      widgets: [w('radar', 6, 6, { source: 'blend' }), w('radar', 6, 6, { source: 'site-vel' })],
+      widgets: [
+        w({ type: 'radar', w: 6, h: 6, source: 'blend' }),
+        w({ type: 'radar', w: 6, h: 6, source: 'site-vel' }),
+      ],
     },
     {
       id: 'no-tv',
       name: 'No TV',
       rows: 6,
       widgets: [
-        w('radar', 8, 6, { source: 'blend' }),
-        w('alerts', 4, 3),
-        w('conditions', 4, 1),
-        w('tropical', 4, 1),
-        w('links', 4, 1),
+        w({ type: 'radar', w: 8, h: 6, source: 'blend' }),
+        w({ type: 'alerts', w: 4, h: 3 }),
+        w({ type: 'conditions', w: 4, h: 1 }),
+        w({ type: 'tropical', w: 4, h: 1 }),
+        w({ type: 'links', w: 4, h: 1 }),
       ],
     },
   ];
@@ -92,7 +108,18 @@ const slug = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
-    .slice(0, 30) || 'board';
+    .slice(0, MAX_SLUG_LENGTH) || 'board';
+
+/** Board-shaped storage/share data: an object with a widgets array; every other field still untrusted. */
+interface RawBoard {
+  // Not checked at runtime: String() below coerces whatever is actually stored.
+  id?: string | number;
+  name?: string | number;
+  rows?: unknown;
+  widgets: unknown[];
+}
+const isRawBoard = (b: unknown): b is RawBoard =>
+  typeof b === 'object' && b !== null && Array.isArray((b as { widgets?: unknown }).widgets);
 
 /** Validates untrusted board data (storage, share links) and drops anything malformed. */
 export function sanitizeBoards(input: unknown): Board[] | null {
@@ -101,22 +128,19 @@ export function sanitizeBoards(input: unknown): Board[] | null {
   }
   const ids = new Set<string>();
   const boards: Board[] = [];
-  for (const b of input.slice(0, 20)) {
-    if (!b || typeof b !== 'object' || !Array.isArray(b.widgets)) {
-      continue;
-    }
+  for (const b of input.slice(0, MAX_BOARDS).filter(isRawBoard)) {
     let id = slug(String(b.id ?? b.name ?? 'board'));
     while (ids.has(id)) {
       id += '-2';
     }
     ids.add(id);
-    const rows = clamp(Number(b.rows) || 6, 1, MAX_ROWS);
+    const rows = clamp(Number(b.rows) || DEFAULT_ROWS, 1, MAX_ROWS);
     boards.push({
       id,
-      name: String(b.name ?? id).slice(0, 40),
+      name: String(b.name ?? id).slice(0, MAX_NAME_LENGTH),
       rows,
-      widgets: (b.widgets as unknown[]).slice(0, 30).flatMap((x) => {
-        const v = x as Partial<Widget>;
+      widgets: b.widgets.slice(0, MAX_WIDGETS).flatMap((x) => {
+        const v = x as Partial<Widget> | null | undefined;
         if (!v || !isType(v.type)) {
           return [];
         }
@@ -124,10 +148,10 @@ export function sanitizeBoards(input: unknown): Board[] | null {
           {
             id: uid(),
             type: v.type,
-            w: clamp(Number(v.w) || 4, 1, GRID_COLS),
-            h: clamp(Number(v.h) || 2, 1, MAX_ROWS),
+            w: clamp(Number(v.w) || DEFAULT_SIZE.w, 1, GRID_COLS),
+            h: clamp(Number(v.h) || DEFAULT_SIZE.h, 1, MAX_ROWS),
             ...(isSource(v.source) ? { source: v.source } : {}),
-            ...(typeof v.channel === 'string' && v.channel.length < 100
+            ...(typeof v.channel === 'string' && v.channel.length < MAX_CHANNEL_LENGTH
               ? { channel: v.channel }
               : {}),
           },
@@ -144,11 +168,12 @@ export class BoardsStore {
   private readonly persist = inject(Persist);
   readonly boards = this.persist.signal<Board[]>('sw.boards', defaultBoards(), sanitizeBoards);
 
-  readonly first = computed(() => this.boards()[0]);
+  /** Never empty: sanitizeBoards falls back to defaults and removal keeps the last board. */
+  readonly first = computed(() => this.boards()[0]!);
 
   byId(id: string | undefined): Board {
     const all = this.boards();
-    return all.find((b) => b.id === id) ?? all[0];
+    return all.find((b) => b.id === id) ?? all[0]!;
   }
 
   private updateBoard(id: string, fn: (b: Board) => Board): void {
@@ -170,7 +195,15 @@ export class BoardsStore {
     }
     const board: Board = copyOf
       ? { ...copyOf, id, name, widgets: copyOf.widgets.map((x) => ({ ...x, id: uid() })) }
-      : { id, name, rows: 6, widgets: [w('radar', 8, 6, { source: 'blend' }), w('alerts', 4, 6)] };
+      : {
+          id,
+          name,
+          rows: 6,
+          widgets: [
+            w({ type: 'radar', w: 8, h: 6, source: 'blend' }),
+            w({ type: 'alerts', w: 4, h: 6 }),
+          ],
+        };
     this.boards.update((all) => [...all, board]);
     return board;
   }
@@ -180,7 +213,7 @@ export class BoardsStore {
   }
 
   renameBoard(id: string, name: string): void {
-    this.updateBoard(id, (b) => ({ ...b, name: name.slice(0, 40) || b.name }));
+    this.updateBoard(id, (b) => ({ ...b, name: name.slice(0, MAX_NAME_LENGTH) || b.name }));
   }
 
   setRows(id: string, rows: number): void {
@@ -195,25 +228,27 @@ export class BoardsStore {
       if (i < 0 || j < 0 || j >= list.length) {
         return all;
       }
-      [list[i], list[j]] = [list[j], list[i]];
+      [list[i], list[j]] = [list[j]!, list[i]!];
       return list;
     });
   }
 
   addWidget(boardId: string, type: WidgetType): void {
-    const sizes: Record<WidgetType, [number, number]> = {
-      radar: [6, 4],
-      player: [4, 3],
-      channels: [4, 2],
-      alerts: [3, 3],
-      conditions: [3, 1],
-      tropical: [3, 2],
-      links: [3, 1],
+    const sizes: Record<WidgetType, { w: number; h: number }> = {
+      radar: { w: 6, h: 4 },
+      player: { w: 4, h: 3 },
+      channels: { w: 4, h: 2 },
+      alerts: { w: 3, h: 3 },
+      conditions: { w: 3, h: 1 },
+      tropical: { w: 3, h: 2 },
+      links: { w: 3, h: 1 },
     };
-    const [width, height] = sizes[type];
     this.updateBoard(boardId, (b) => ({
       ...b,
-      widgets: [...b.widgets, w(type, width, height, type === 'radar' ? { source: 'blend' } : {})],
+      widgets: [
+        ...b.widgets,
+        w({ type, ...sizes[type], ...(type === 'radar' ? { source: 'blend' } : {}) }),
+      ],
     }));
   }
 

@@ -1,0 +1,143 @@
+<h2>
+  <span class="title"
+    >Now
+    @if (alerts.station(); as s) {
+      · {{ s.name }}
+    } @else if (alerts.observation(); as o) {
+      · {{ o.stationName }}
+    }
+  </span>
+  @if (alerts.station(); as s) {
+    <span class="meta">{{ s.at | date: 'shortTime' }}</span>
+  } @else if (alerts.observation(); as o) {
+    <span class="meta">{{ o.timestamp | date: 'shortTime' }}</span>
+  }
+  <sw-card-buttons [card]="card" />
+</h2>
+<div class="scroll">
+  @if (alerts.station(); as s) {
+    <p class="src muted">
+      Home station{{ s.place ? ' in ' + s.place : '' }}, {{ s.distanceMi | number: '1.0-1' }} mi
+      away
+      @if (settings.pws() === s.id) {
+        · pinned
+      }
+    </p>
+    @if (alerts.feeds().pws.error) {
+      <p class="warn small">Home station network unreachable, showing the last readings.</p>
+    }
+    <div class="stats">
+      <div>
+        <b>{{ s.tempF ?? '–' }}°</b><small>feels {{ s.feelsLikeF ?? '–' }}°</small>
+      </div>
+      <div>
+        <b>{{ s.windMph ?? '–' }}</b
+        ><small>wind {{ compass(s.windDir) }}</small>
+      </div>
+      <div>
+        <b>{{ s.gustMph ?? '–' }}</b
+        ><small>gust · max {{ s.maxGustMph ?? '–' }}</small>
+      </div>
+      <div>
+        <b>{{ s.rainRateIn ?? '–' }}</b
+        ><small>rain in/hr</small>
+      </div>
+      <div>
+        <b>{{ s.rainTodayIn ?? '–' }}</b
+        ><small>rain today</small>
+      </div>
+      @if (s.rainEventIn) {
+        <div>
+          <b>{{ s.rainEventIn }}</b
+          ><small>storm total</small>
+        </div>
+      }
+      <div>
+        <b>{{ s.humidity ?? '–' }}%</b><small>humidity</small>
+      </div>
+      <div>
+        <b>{{ s.pressureInHg ?? '–' }}</b
+        ><small>inHg</small>
+      </div>
+    </div>
+  }
+
+  @if (alerts.observation(); as o) {
+    @if (alerts.station()) {
+      <p class="nws">
+        <b>NWS {{ o.station }}</b>
+        @if (o.distanceMi !== null) {
+          <span class="muted"> ({{ o.distanceMi | number: '1.0-0' }} mi)</span>
+        }
+        {{ o.tempF ?? '–' }}° · wind {{ compass(o.windDir) }} {{ o.windMph ?? '–' }}
+        @if (o.gustMph) {
+          G {{ o.gustMph }}
+        }
+        mph · {{ o.pressureInHg ?? '–' }} inHg
+        <span class="muted">· {{ o.text }} · {{ o.timestamp | date: 'shortTime' }}</span>
+      </p>
+    } @else {
+      <p class="src muted">
+        NWS station {{ o.station }}
+        @if (o.distanceMi !== null) {
+          , {{ o.distanceMi | number: '1.0-0' }} mi away
+        }
+      </p>
+      <div class="stats">
+        <div>
+          <b>{{ o.tempF ?? '–' }}°</b><small>feels {{ o.feelsLikeF ?? '–' }}°</small>
+        </div>
+        <div>
+          <b>{{ o.windMph ?? '–' }}</b
+          ><small>wind {{ compass(o.windDir) }}</small>
+        </div>
+        <div>
+          <b>{{ o.gustMph ?? '–' }}</b
+          ><small>gust</small>
+        </div>
+        <div>
+          <b>{{ o.humidity ?? '–' }}%</b><small>humidity</small>
+        </div>
+        <div>
+          <b>{{ o.pressureInHg ?? '–' }}</b
+          ><small>inHg</small>
+        </div>
+      </div>
+      @if (o.text) {
+        <p class="muted small">{{ o.text }}</p>
+      }
+    }
+  } @else if (!alerts.station()) {
+    @if (alerts.feeds().observation.error) {
+      <p class="err">Conditions unavailable right now.</p>
+    } @else {
+      <p class="muted">Loading conditions…</p>
+    }
+  }
+
+  @if (others().length) {
+    <details class="nearby">
+      <summary class="muted">
+        Nearby home stations ({{ alerts.stations().length }} reporting)
+      </summary>
+      <ul>
+        @for (s of alerts.stations(); track s.id) {
+          <li [class.current]="s.id === alerts.station()?.id">
+            <button type="button" [title]="'Use ' + s.name" (click)="pin(s.id)">
+              <span class="nm">{{ s.name }}</span>
+              <span class="muted">{{ s.distanceMi | number: '1.0-1' }} mi</span>
+              <span>{{ s.tempF }}°</span>
+              <span>G {{ s.gustMph ?? '–' }}</span>
+              <span>{{ s.rainTodayIn ?? '–' }}″</span>
+            </button>
+          </li>
+        }
+      </ul>
+      @if (settings.pws()) {
+        <button type="button" class="link" (click)="pin(null)">Use the nearest station</button>
+      }
+    </details>
+  } @else if (alerts.feeds().pws.error && !alerts.stations().length) {
+    <p class="muted small">Home station network unavailable.</p>
+  }
+</div>

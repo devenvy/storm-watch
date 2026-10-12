@@ -23,6 +23,14 @@ const WATCHDOG_MS = 2_000;
 /** Playback this long without trouble resets the retry backoff. */
 const HEALTHY_MS = 30_000;
 const MAX_BACKOFF_MS = 15_000;
+/** First retry delay; doubles with each further attempt up to MAX_BACKOFF_MS. */
+const BASE_BACKOFF_MS = 1_000;
+const BACKOFF_FACTOR = 2;
+/** In-place hls.js media recoveries (plain, then codec swap) before a full reload. */
+const MAX_MEDIA_RECOVERIES = 2;
+const PROBE_TIMEOUT_MS = 8_000;
+/** Enough of the response to see a playlist's '#EXTM3U' header. */
+const PROBE_BYTES = 16;
 
 type StreamKind = 'hls' | 'ts';
 const kinds = new Map<string, StreamKind>();
@@ -43,7 +51,7 @@ async function streamKind(url: string): Promise<StreamKind> {
     return known;
   }
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(url, { signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
     let kind: StreamKind = 'ts';
     if (/mpegurl/i.test(r.headers.get('content-type') ?? '')) {
       kind = 'hls';
@@ -52,7 +60,7 @@ async function streamKind(url: string): Promise<StreamKind> {
       const first = await reader?.read();
       if (
         first?.value &&
-        new TextDecoder().decode(first.value.subarray(0, 16)).startsWith('#EXTM3U')
+        new TextDecoder().decode(first.value.subarray(0, PROBE_BYTES)).startsWith('#EXTM3U')
       ) {
         kind = 'hls';
       }
@@ -77,18 +85,7 @@ async function streamKind(url: string): Promise<StreamKind> {
 @Component({
   selector: 'sw-player',
   template: `<video #video controls autoplay playsinline [muted]="muted()"></video>`,
-  styles: `
-    :host {
-      display: block;
-      background: #000;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      display: block;
-      background: #000;
-    }
-  `,
+  styleUrl: './player.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Player implements OnDestroy {
@@ -113,7 +110,7 @@ export class Player implements OnDestroy {
     effect(() => {
       const url = this.url();
       this.attempt = 0;
-      void this.start(url);
+      this.launch(url);
     });
   }
 
@@ -135,7 +132,9 @@ export class Player implements OnDestroy {
       this.ts = null;
     }
     const v = this.video().nativeElement;
-    v.onplaying = v.onended = v.onerror = null;
+    v.onplaying = null;
+    v.onended = null;
+    v.onerror = null;
     v.removeAttribute('src');
     v.load();
   }
@@ -148,9 +147,16 @@ export class Player implements OnDestroy {
     }
     this.teardown();
     this.attempt++;
-    const delay = Math.min(MAX_BACKOFF_MS, 1000 * 2 ** (this.attempt - 1));
+    const delay = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * BACKOFF_FACTOR ** (this.attempt - 1));
     this.status.emit({ state: 'reconnecting', attempt: this.attempt, reason });
-    this.retryTimer = setTimeout(() => void this.start(url), delay);
+    this.retryTimer = setTimeout(() => this.launch(url), delay);
+  }
+
+  /** Start playback, reporting anything unexpected that escapes {@link start} as an error. */
+  private launch(url: string | null): void {
+    this.start(url).catch((e: unknown) => {
+      this.status.emit({ state: 'error', message: e instanceof Error ? e.message : String(e) });
+    });
   }
 
   private async start(url: string | null): Promise<void> {
@@ -187,7 +193,7 @@ export class Player implements OnDestroy {
 
     if (kind === 'hls') {
       if (Hls.isSupported()) {
-        const hls = (this.hls = new Hls({
+        const hls = new Hls({
           liveSyncDurationCount: 3,
           liveMaxLatencyDurationCount: 10,
           maxBufferLength: 30,
@@ -195,12 +201,16 @@ export class Player implements OnDestroy {
           manifestLoadingMaxRetry: 4,
           levelLoadingMaxRetry: 4,
           fragLoadingMaxRetry: 6,
-        }));
+        });
+        this.hls = hls;
         hls.on(Hls.Events.ERROR, (_e, d) => {
           if (!d.fatal) {
             return;
           }
-          if (d.type === Hls.ErrorTypes.MEDIA_ERROR && this.mediaRecoveries < 2) {
+          if (
+            d.type === Hls.ErrorTypes.MEDIA_ERROR &&
+            this.mediaRecoveries < MAX_MEDIA_RECOVERIES
+          ) {
             // First try a plain recovery, then one with codec swap, before a full reload.
             if (this.mediaRecoveries++ === 1) {
               hls.swapAudioCodec();
@@ -220,7 +230,7 @@ export class Player implements OnDestroy {
         return;
       }
     } else if (mpegts.isSupported()) {
-      const p = (this.ts = mpegts.createPlayer(
+      const p = mpegts.createPlayer(
         { type: 'mpegts', isLive: true, url },
         {
           enableWorker: true,
@@ -228,7 +238,8 @@ export class Player implements OnDestroy {
           lazyLoad: false,
           autoCleanupSourceBuffer: true,
         },
-      ));
+      );
+      this.ts = p;
       p.on(mpegts.Events.ERROR, (type: string, d: string) => this.reconnect(`${type}: ${d}`));
       p.on(mpegts.Events.MEDIA_INFO, (mi: { videoCodec?: string; audioCodec?: string }) => {
         detail = `${mi.videoCodec ?? '?'} / ${mi.audioCodec ?? '?'}`;
@@ -240,7 +251,7 @@ export class Player implements OnDestroy {
       return;
     }
 
-    v.play()?.catch(() =>
+    v.play().catch(() =>
       this.status.emit({ state: 'error', message: 'Autoplay blocked: press play.' }),
     );
     this.startWatchdog();

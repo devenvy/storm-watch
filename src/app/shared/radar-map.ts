@@ -26,7 +26,23 @@ import type { WarningShape } from '../core/nws.service';
 
 const SPEEDS = { slow: 1400, normal: 800, fast: 350 } as const;
 type Speed = keyof typeof SPEEDS;
-const REFRESH_MS = 3 * 60_000;
+const MS_PER_MINUTE = 60_000;
+const MINUTES_PER_HOUR = 60;
+function isSpeed(value: string): value is Speed {
+  return Object.hasOwn(SPEEDS, value);
+}
+const REFRESH_MINUTES = 3;
+const REFRESH_MS = REFRESH_MINUTES * MS_PER_MINUTE;
+/** Frames within this many minutes of now are labelled "now". */
+const NOW_WINDOW_MINUTES = 3;
+const DEFAULT_ZOOM = 8;
+/** Opacity of the radar frame being shown. */
+const FRAME_OPACITY = 0.75;
+/** Playback needs at least this many frames. */
+const MIN_PLAYABLE_FRAMES = 2;
+/** Playback lingers this many times longer on the newest observed frame and the final frame. */
+const BOUNDARY_HOLD_FACTOR = 2.5;
+const PERCENT = 100;
 const MAX_TICKS = 9;
 const COLORS: Record<string, string> = {
   'Tornado Warning': '#ff2d2d',
@@ -35,8 +51,11 @@ const COLORS: Record<string, string> = {
   'Extreme Wind Warning': '#ff4fd8',
 };
 
-/** Popup built from DOM text nodes: alert text comes from a remote feed and must not be parsed as HTML. */
-function popup(event: string, headline: string): HTMLElement {
+/**
+ * Popup built from DOM text nodes: alert text comes from a remote feed and must not be parsed as HTML.
+ * The feed can omit the headline even though the type says otherwise.
+ */
+function popup(event: string, headline: string | null | undefined): HTMLElement {
   const el = document.createElement('div');
   const b = el.appendChild(document.createElement('b'));
   b.textContent = event;
@@ -46,265 +65,38 @@ function popup(event: string, headline: string): HTMLElement {
 }
 
 function relative(t: Date, now: number): string {
-  const m = Math.round((t.getTime() - now) / 60_000);
-  if (Math.abs(m) < 3) {
+  const m = Math.round((t.getTime() - now) / MS_PER_MINUTE);
+  if (Math.abs(m) < NOW_WINDOW_MINUTES) {
     return 'now';
   }
   const sign = m < 0 ? '−' : '+';
   const a = Math.abs(m);
-  return a < 60
+  return a < MINUTES_PER_HOUR
     ? `${sign}${a} min`
-    : `${sign}${Math.floor(a / 60)} h${a % 60 ? ` ${a % 60} m` : ''}`;
+    : `${sign}${Math.floor(a / MINUTES_PER_HOUR)} h${a % MINUTES_PER_HOUR ? ` ${a % MINUTES_PER_HOUR} m` : ''}`;
+}
+
+function logReloadError(err: unknown): void {
+  console.error('Radar reload failed', err);
 }
 
 /** Radar map with a scrubbable timeline over any RadarSources frame set, plus warning polygons. */
 @Component({
   selector: 'sw-radar-map',
   imports: [DatePipe],
-  template: `
-    <div class="mapwrap">
-      <div #map class="map" tabindex="0" aria-label="Radar map"></div>
-      @if (frame()?.kind === 'forecast') {
-        <span class="badge">FORECAST · model</span>
-      }
-      @if (loading()) {
-        <span class="badge loading">Loading…</span>
-      }
-      @if (error()) {
-        <span class="badge err">{{ error() }}</span>
-      }
-    </div>
-    <div class="timeline">
-      <div class="controls">
-        <button title="First" aria-label="First frame" (click)="go(0)">⏮</button>
-        <button title="Back (←)" aria-label="Previous frame" (click)="step(-1)">◀</button>
-        <button
-          class="play"
-          [attr.aria-label]="playing() ? 'Pause' : 'Play'"
-          (click)="playing.set(!playing())"
-        >
-          {{ playing() ? '⏸' : '▶' }}
-        </button>
-        <button title="Forward (→)" aria-label="Next frame" (click)="step(1)">▶</button>
-        <button
-          title="Latest observed"
-          aria-label="Latest observed frame"
-          (click)="go(set().startIndex)"
-        >
-          ●
-        </button>
-        <button title="Last" aria-label="Last frame" (click)="go(last())">⏭</button>
-        @if (frame(); as f) {
-          <span class="time" [class.future]="f.kind === 'forecast'">
-            <b>{{ f.time | date: 'h:mm a' }}</b
-            ><small>{{ rel(f.time) }}</small>
-          </span>
-        }
-        <select
-          aria-label="Playback speed"
-          [value]="speed()"
-          (change)="speed.set($any($event.target).value)"
-        >
-          <option value="slow">Slow</option>
-          <option value="normal">Normal</option>
-          <option value="fast">Fast</option>
-        </select>
-      </div>
-      <div class="track">
-        @if (nowPct() !== null) {
-          <span class="nowline" title="Now" [style.left.%]="nowPct()"></span>
-        }
-        <input
-          type="range"
-          min="0"
-          step="1"
-          aria-label="Radar time"
-          [max]="last()"
-          [value]="index()"
-          (input)="go(+$any($event.target).value)"
-        />
-      </div>
-      <div class="ticks">
-        @for (t of ticks(); track t.i) {
-          <button
-            class="tick"
-            [class.on]="t.i === index()"
-            [class.future]="t.f.kind === 'forecast'"
-            [style.left.%]="pct(t.i)"
-            (click)="go(t.i)"
-          >
-            {{ t.f.time | date: 'h:mm' }}
-          </button>
-        }
-      </div>
-      <div class="legend">
-        <i style="background:#ff2d2d"></i>Tornado <i style="background:#ff9f1a"></i>Svr T-storm
-        <i style="background:#2ecc71"></i>Flash flood <i style="background:#ff4fd8"></i>Ext. wind
-        @if (set().note) {
-          <span class="note">{{ set().note }}</span>
-        }
-        <button class="link" (click)="recenter()">Recenter</button>
-      </div>
-    </div>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .mapwrap {
-      flex: 1;
-      min-height: 220px;
-      position: relative;
-    }
-    .map {
-      position: absolute;
-      inset: 0;
-      border-radius: 6px;
-      background: #111;
-    }
-    :host ::ng-deep .basemap {
-      filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.4);
-    }
-    .badge {
-      position: absolute;
-      top: 8px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 500;
-      padding: 3px 10px;
-      border-radius: 4px;
-      background: #6e40c9;
-      color: #fff;
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      pointer-events: none;
-    }
-    .badge.loading {
-      background: #21262d;
-      top: auto;
-      bottom: 8px;
-    }
-    .badge.err {
-      background: var(--red);
-      top: auto;
-      bottom: 8px;
-    }
-    .timeline {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-    .controls {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .controls button {
-      padding: 4px 9px;
-      min-width: 34px;
-    }
-    .play {
-      border-color: var(--blue);
-    }
-    .time {
-      display: flex;
-      gap: 6px;
-      align-items: baseline;
-      margin: 0 6px;
-      font-variant-numeric: tabular-nums;
-    }
-    .time b {
-      font-size: 18px;
-    }
-    .time small {
-      color: var(--muted);
-    }
-    .time.future b,
-    .time.future small {
-      color: #b392f0;
-    }
-    .controls select {
-      margin-left: auto;
-      padding: 4px 6px;
-    }
-    .track {
-      position: relative;
-    }
-    .track input {
-      width: 100%;
-      accent-color: var(--blue);
-      position: relative;
-    }
-    .nowline {
-      position: absolute;
-      top: -2px;
-      bottom: -2px;
-      width: 2px;
-      background: var(--yellow);
-      pointer-events: none;
-      margin-left: 7px;
-    }
-    .ticks {
-      position: relative;
-      height: 16px;
-      margin: 0 7px;
-    }
-    .tick {
-      position: absolute;
-      transform: translateX(-50%);
-      background: none;
-      border: none;
-      padding: 0 2px;
-      font-size: 11px;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-      white-space: nowrap;
-    }
-    .tick.future {
-      color: #8b72c9;
-    }
-    .tick.on {
-      color: var(--fg);
-      font-weight: 700;
-    }
-    .legend {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      font-size: 12px;
-      color: var(--muted);
-      flex-wrap: wrap;
-    }
-    .legend i {
-      width: 10px;
-      height: 10px;
-      border-radius: 2px;
-      display: inline-block;
-    }
-    .note {
-      color: #b392f0;
-    }
-    .link {
-      margin-left: auto;
-      padding: 2px 8px;
-      font-size: 12px;
-    }
-  `,
+  templateUrl: './radar-map.html',
+  styleUrl: './radar-map.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(keydown)': 'onKey($event)' },
 })
 export class RadarMap implements OnDestroy {
+  private readonly sources = inject(RadarSources);
+
   readonly center = input.required<[number, number]>();
   readonly shapes = input<WarningShape[]>([]);
   readonly source = input<RadarSourceId>('blend');
   readonly station = input('');
-  readonly zoom = input(8);
-
-  private readonly sources = inject(RadarSources);
+  readonly zoom = input(DEFAULT_ZOOM);
 
   protected readonly set = signal<RadarSet>({ frames: [], startIndex: 0 });
   /** Starts paused on the newest observed frame; playing is opt-in. */
@@ -347,10 +139,11 @@ export class RadarMap implements OnDestroy {
 
   constructor() {
     afterNextRender(() => {
-      const map = (this.map = L.map(this.el().nativeElement, { keyboard: false }).setView(
+      const map = L.map(this.el().nativeElement, { keyboard: false }).setView(
         this.center(),
         this.zoom(),
-      ));
+      );
+      this.map = map;
       // Standard OSM tiles (no key), darkened via the .basemap CSS filter so radar colors stand out.
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution:
@@ -368,12 +161,14 @@ export class RadarMap implements OnDestroy {
       })
         .addTo(map)
         .bindTooltip('Home');
-      this.resize = new ResizeObserver(() => this.map?.invalidateSize());
+      this.resize = new ResizeObserver(() => {
+        this.map?.invalidateSize();
+      });
       this.resize.observe(this.el().nativeElement);
       this.timers.push(
         setInterval(() => {
           this.now.set(Date.now());
-          this.reload(true);
+          this.reload(true).catch(logReloadError);
         }, REFRESH_MS),
       );
       this.ready.set(true);
@@ -384,7 +179,9 @@ export class RadarMap implements OnDestroy {
       this.source();
       this.station();
       if (this.ready()) {
-        untracked(async () => this.reload(false));
+        untracked(() => {
+          this.reload(false).catch(logReloadError);
+        });
       }
     });
 
@@ -395,21 +192,21 @@ export class RadarMap implements OnDestroy {
       if (!this.ready() || !this.layers[i]) {
         return;
       }
-      if (this.shown >= 0 && this.layers[this.shown]) {
-        this.layers[this.shown].setOpacity(0);
+      if (this.shown >= 0) {
+        this.layers[this.shown]?.setOpacity(0);
       }
-      this.layers[i].setOpacity(0.75);
+      this.layers[i].setOpacity(FRAME_OPACITY);
       this.shown = i;
     });
 
     // Playback; holds on the newest observed frame and the final frame so loop boundaries are obvious.
     effect((onCleanup) => {
       const frames = this.set().frames;
-      if (!this.playing() || frames.length < 2) {
+      if (!this.playing() || frames.length < MIN_PLAYABLE_FRAMES) {
         return;
       }
       const i = this.index();
-      const hold = i === this.set().startIndex || i === this.last() ? 2.5 : 1;
+      const hold = i === this.set().startIndex || i === this.last() ? BOUNDARY_HOLD_FACTOR : 1;
       const t = setTimeout(
         () => this.index.set((i + 1) % frames.length),
         SPEEDS[this.speed()] * hold,
@@ -456,7 +253,9 @@ export class RadarMap implements OnDestroy {
       if (seq !== this.loadSeq || !this.map) {
         return;
       }
-      this.layers.forEach((l) => l.remove());
+      this.layers.forEach((l) => {
+        l.remove();
+      });
       // Every frame stays on the map at opacity 0 so tiles preload and scrubbing is instant.
       this.layers = next.frames.map((f) =>
         L.tileLayer(f.url, {
@@ -483,12 +282,18 @@ export class RadarMap implements OnDestroy {
     }
   }
 
+  protected setSpeed(value: string): void {
+    if (isSpeed(value)) {
+      this.speed.set(value);
+    }
+  }
+
   protected rel(t: Date): string {
     return relative(t, this.now());
   }
 
   protected pct(i: number): number {
-    return this.last() ? (i / this.last()) * 100 : 0;
+    return this.last() ? (i / this.last()) * PERCENT : 0;
   }
 
   protected go(i: number): void {

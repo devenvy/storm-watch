@@ -9,7 +9,18 @@ const HEADERS = { Accept: 'application/geo+json' };
 /** Requests that hang longer than this fail, so a poll never blocks the next one forever. */
 export const FETCH_TIMEOUT_MS = 20_000;
 /** An observation older than this is skipped in favor of the next nearest station. */
-const OBS_STALE_MS = 2 * 60 * 60_000;
+const OBS_STALE_MS = 7_200_000; // 2 hours
+/** api.weather.gov expects point coordinates with at most 4 decimal places. */
+const COORD_DECIMALS = 4;
+/** Sort rank for alerts whose severity is not in SEVERITY_RANK (e.g. 'Unknown'): after all known ones. */
+const UNRANKED_SEVERITY = 4;
+/** How many of the nearest stations to try before giving up. */
+const MAX_STATIONS_TRIED = 4;
+/** °F = °C * mul / div + add. */
+const C_TO_F = { mul: 9, div: 5, add: 32 };
+const MPH_PER_KMH = 0.621371;
+const PA_PER_INHG = 3386.39;
+const PRESSURE_DECIMALS = 2;
 
 export interface PointInfo {
   city: string;
@@ -133,7 +144,10 @@ interface ObservationResponse {
 @Injectable({ providedIn: 'root' })
 export class NwsService {
   private async get<T>(url: string): Promise<T> {
-    const r = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    const r = await fetch(url, {
+      headers: HEADERS,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!r.ok) {
       throw new Error(`NWS ${r.status} for ${url}`);
     }
@@ -141,7 +155,9 @@ export class NwsService {
   }
 
   async point(lat: number, lon: number): Promise<PointInfo> {
-    const d = await this.get<PointsResponse>(`${NWS}/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
+    const d = await this.get<PointsResponse>(
+      `${NWS}/points/${lat.toFixed(COORD_DECIMALS)},${lon.toFixed(COORD_DECIMALS)}`,
+    );
     const p = d.properties;
     return {
       city: p.relativeLocation?.properties?.city ?? '',
@@ -154,11 +170,15 @@ export class NwsService {
 
   async alertsAt(lat: number, lon: number): Promise<NwsAlert[]> {
     const d = await this.get<AlertsResponse>(
-      `${NWS}/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
+      `${NWS}/alerts/active?point=${lat.toFixed(COORD_DECIMALS)},${lon.toFixed(COORD_DECIMALS)}`,
     );
     return d.features
       .map((f) => f.properties)
-      .sort((a, b) => (SEVERITY_RANK[a.severity] ?? 4) - (SEVERITY_RANK[b.severity] ?? 4));
+      .sort(
+        (a, b) =>
+          (SEVERITY_RANK[a.severity] ?? UNRANKED_SEVERITY) -
+          (SEVERITY_RANK[b.severity] ?? UNRANKED_SEVERITY),
+      );
   }
 
   async warningShapes(): Promise<WarningShape[]> {
@@ -184,22 +204,21 @@ export class NwsService {
         return { ...f.properties, distanceMi: c ? miles(lat, lon, c[1], c[0]) : Infinity };
       })
       .sort((a, b) => a.distanceMi - b.distanceMi)
-      .slice(0, 4);
+      .slice(0, MAX_STATIONS_TRIED);
     let found: { s: (typeof candidates)[number]; obs: ObservationResponse } | undefined;
     for (const s of candidates) {
-      let obs: ObservationResponse;
-      try {
-        obs = await this.get<ObservationResponse>(
-          `${NWS}/stations/${s.stationIdentifier}/observations/latest`,
-        );
-      } catch {
-        continue;
-      }
-      found ??= { s, obs };
-      const age = Date.now() - Date.parse(obs.properties.timestamp);
-      if (age < OBS_STALE_MS && obs.properties.temperature?.value != null) {
-        found = { s, obs };
-        break;
+      // A station that fails to respond is skipped.
+      const obs = await this.get<ObservationResponse>(
+        `${NWS}/stations/${s.stationIdentifier}/observations/latest`,
+      ).catch(() => null);
+      if (obs) {
+        found ??= { s, obs };
+        const age = Date.now() - Date.parse(obs.properties.timestamp);
+        const temp = obs.properties.temperature?.value;
+        if (age < OBS_STALE_MS && temp !== null && temp !== undefined) {
+          found = { s, obs };
+          break;
+        }
       }
     }
     if (!found) {
@@ -208,9 +227,11 @@ export class NwsService {
     const { s: first, obs: d } = found;
     const p = d.properties;
     const cToF = (v: number | null | undefined) =>
-      v == null ? null : Math.round((v * 9) / 5 + 32);
+      v === null || v === undefined ? null : Math.round((v * C_TO_F.mul) / C_TO_F.div + C_TO_F.add);
     const kmhToMph = (v: number | null | undefined) =>
-      v == null ? null : Math.round(v * 0.621371);
+      v === null || v === undefined ? null : Math.round(v * MPH_PER_KMH);
+    const humidity = p.relativeHumidity?.value;
+    const pressurePa = p.barometricPressure?.value;
     return {
       station: first.stationIdentifier,
       stationName: first.name,
@@ -219,14 +240,14 @@ export class NwsService {
       text: p.textDescription,
       tempF: cToF(p.temperature?.value),
       feelsLikeF: cToF(p.heatIndex?.value ?? p.windChill?.value ?? p.temperature?.value),
-      humidity: p.relativeHumidity?.value == null ? null : Math.round(p.relativeHumidity.value),
+      humidity: humidity === null || humidity === undefined ? null : Math.round(humidity),
       windMph: kmhToMph(p.windSpeed?.value),
       gustMph: kmhToMph(p.windGust?.value),
       windDir: p.windDirection?.value ?? null,
       pressureInHg:
-        p.barometricPressure?.value == null
+        pressurePa === null || pressurePa === undefined
           ? null
-          : +(p.barometricPressure.value / 3386.39).toFixed(2),
+          : Number((pressurePa / PA_PER_INHG).toFixed(PRESSURE_DECIMALS)),
     };
   }
 }

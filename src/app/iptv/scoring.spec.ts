@@ -74,6 +74,6 @@ describe('parseM3u', () => {
       logo: 'http://l/4.png',
     });
     expect(list[1]).toMatchObject({ name: 'Plain', url: 'http://host/live/2.m3u8' });
-    expect(list[0].key).not.toEqual(list[1].key);
+    expect(list[0]!.key).not.toEqual(list[1]!.key);
   });
 });

@@ -36,9 +36,9 @@ describe('parseStations', () => {
       NOW,
     );
     expect(out.map((s) => s.id)).toEqual(['near', 'far']);
-    expect(out[0].name).toBe('near');
-    expect(out[0].rainTodayIn).toBe(1.2);
-    expect(Object.keys(out[0])).not.toContain('macAddress');
+    expect(out[0]!.name).toBe('near');
+    expect(out[0]!.rainTodayIn).toBe(1.2);
+    expect(Object.keys(out[0]!)).not.toContain('macAddress');
     expect(JSON.stringify(out)).not.toContain('Main St');
   });
 

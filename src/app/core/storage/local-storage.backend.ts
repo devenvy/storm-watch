@@ -7,7 +7,7 @@ export class LocalStorageBackend implements StorageBackend {
   async get<T>(key: string): Promise<T | undefined> {
     try {
       const raw = localStorage.getItem(key);
-      return raw == null ? undefined : (JSON.parse(raw) as T);
+      return raw === null ? undefined : (JSON.parse(raw) as T);
     } catch {
       return undefined;
     }

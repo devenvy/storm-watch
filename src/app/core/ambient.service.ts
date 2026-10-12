@@ -11,10 +11,34 @@ import { miles } from '../shared/format';
  */
 const AMBIENT = 'https://lightning.ambientweather.net/devices';
 /** Stations that haven't reported for this long are treated as offline (many listed stations are long dead). */
-export const STALE_MS = 30 * 60_000;
+export const STALE_MS = 1_800_000; // 30 minutes
+/** Readings timestamped further than this in the future (clock skew) are rejected. */
+const MAX_FUTURE_SKEW_MS = 300_000; // 5 minutes
+const BOX_NEAR_DEG = 0.15;
+const BOX_WIDE_DEG = 0.4;
 /** Search boxes, in degrees around home, tried until enough active stations are found. */
-const BOXES = [0.15, 0.4];
+const BOXES = [BOX_NEAR_DEG, BOX_WIDE_DEG];
 const WANT = 5;
+const MAX_RESULTS = 10;
+const MAX_LAT_DEG = 90;
+const MAX_LON_DEG = 180;
+const MAX_ID_LENGTH = 64;
+const MAX_NAME_LENGTH = 80;
+
+/** Accepted range and rounding (decimal places) for each outdoor reading kept. */
+const READINGS = {
+  tempf: { lo: -80, hi: 140, dp: 0 },
+  feelsLike: { lo: -100, hi: 180, dp: 0 },
+  humidity: { lo: 0, hi: 100, dp: 0 },
+  windspeedmph: { lo: 0, hi: 250, dp: 0 },
+  windgustmph: { lo: 0, hi: 300, dp: 0 },
+  maxdailygust: { lo: 0, hi: 300, dp: 0 },
+  winddir: { lo: 0, hi: 360, dp: 0 },
+  hourlyrainin: { lo: 0, hi: 50, dp: 2 },
+  dailyrainin: { lo: 0, hi: 100, dp: 2 },
+  eventrainin: { lo: 0, hi: 200, dp: 2 },
+  baromrelin: { lo: 20, hi: 35, dp: 2 },
+};
 
 export interface PwsStation {
   id: string;
@@ -44,6 +68,63 @@ interface RawDevice {
   lastData?: Record<string, unknown>;
 }
 
+/** A reading in range, rounded to its decimals (stations report e.g. 24.16 mph or 1.618 in). */
+function reading(d: Record<string, unknown>, k: keyof typeof READINGS): number | null {
+  const v = d[k];
+  const { lo, hi, dp } = READINGS[k];
+  return num(v, lo, hi) ? Number(v.toFixed(dp)) : null;
+}
+
+/** One device as a station, or null if it is stale, unlocated or has no outdoor temperature. */
+function toStation(
+  raw: RawDevice | null | undefined,
+  lat: number,
+  lon: number,
+  now: number,
+): PwsStation | null {
+  if (!raw) {
+    return null;
+  }
+  const { _id: id, info, lastData: d } = raw;
+  const c = info?.coords?.coords;
+  if (
+    !d ||
+    !c ||
+    !num(c.lat, -MAX_LAT_DEG, MAX_LAT_DEG) ||
+    !num(c.lon, -MAX_LON_DEG, MAX_LON_DEG) ||
+    !str(id, MAX_ID_LENGTH)
+  ) {
+    return null;
+  }
+  const at = d['dateutc'];
+  if (!num(at, now - STALE_MS, now + MAX_FUTURE_SKEW_MS)) {
+    return null;
+  }
+  const tempF = reading(d, 'tempf');
+  if (tempF === null) {
+    return null;
+  }
+  return {
+    id,
+    name:
+      str(info.name, MAX_NAME_LENGTH) && info.name.trim() ? info.name.trim() : 'Weather station',
+    place: str(info.coords?.location, MAX_NAME_LENGTH) ? info.coords.location : '',
+    distanceMi: miles(lat, lon, c.lat, c.lon),
+    at,
+    tempF,
+    feelsLikeF: reading(d, 'feelsLike'),
+    humidity: reading(d, 'humidity'),
+    windMph: reading(d, 'windspeedmph'),
+    gustMph: reading(d, 'windgustmph'),
+    maxGustMph: reading(d, 'maxdailygust'),
+    windDir: reading(d, 'winddir'),
+    rainRateIn: reading(d, 'hourlyrainin'),
+    rainTodayIn: reading(d, 'dailyrainin'),
+    rainEventIn: reading(d, 'eventrainin'),
+    pressureInHg: reading(d, 'baromrelin'),
+  };
+}
+
 /**
  * Keep only stations that reported recently and have outdoor readings, nearest first.
  * Only outdoor weather fields are kept: owner addresses, MAC addresses and indoor readings are dropped.
@@ -54,49 +135,16 @@ export function parseStations(
   lon: number,
   now = Date.now(),
 ): PwsStation[] {
-  const list = (body as { data?: unknown })?.data;
+  const list = ((body ?? {}) as { data?: unknown }).data;
   if (!Array.isArray(list)) {
     throw new Error('Unexpected Ambient response');
   }
-  /** A reading in range, rounded to `dp` decimals (stations report e.g. 24.16 mph or 1.618 in). */
-  const val = (d: Record<string, unknown>, k: string, lo: number, hi: number, dp = 0) => {
-    const v = d[k];
-    return num(v, lo, hi) ? +v.toFixed(dp) : null;
-  };
   const out: PwsStation[] = [];
-  for (const raw of list as RawDevice[]) {
-    const d = raw?.lastData;
-    const c = raw?.info?.coords?.coords;
-    if (!d || !c || !num(c.lat, -90, 90) || !num(c.lon, -180, 180) || !str(raw._id, 64)) {
-      continue;
+  for (const raw of list as (RawDevice | null | undefined)[]) {
+    const station = toStation(raw, lat, lon, now);
+    if (station) {
+      out.push(station);
     }
-    const at = d['dateutc'];
-    if (!num(at, now - STALE_MS, now + 5 * 60_000)) {
-      continue;
-    }
-    const tempF = val(d, 'tempf', -80, 140);
-    if (tempF == null) {
-      continue;
-    }
-    out.push({
-      id: raw._id,
-      name:
-        str(raw.info?.name, 80) && raw.info.name.trim() ? raw.info.name.trim() : 'Weather station',
-      place: str(raw.info?.coords?.location, 80) ? raw.info.coords.location : '',
-      distanceMi: miles(lat, lon, c.lat, c.lon),
-      at,
-      tempF,
-      feelsLikeF: val(d, 'feelsLike', -100, 180),
-      humidity: val(d, 'humidity', 0, 100),
-      windMph: val(d, 'windspeedmph', 0, 250),
-      gustMph: val(d, 'windgustmph', 0, 300),
-      maxGustMph: val(d, 'maxdailygust', 0, 300),
-      windDir: val(d, 'winddir', 0, 360),
-      rainRateIn: val(d, 'hourlyrainin', 0, 50, 2),
-      rainTodayIn: val(d, 'dailyrainin', 0, 100, 2),
-      rainEventIn: val(d, 'eventrainin', 0, 200, 2),
-      pressureInHg: val(d, 'baromrelin', 20, 35, 2),
-    });
   }
   return out.sort((a, b) => a.distanceMi - b.distanceMi);
 }
@@ -114,7 +162,9 @@ export class AmbientService {
         '$publicBox[1][1]': String(lat + deg),
         $limit: '500',
       });
-      const r = await fetch(`${AMBIENT}?${q}`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+      const r = await fetch(`${AMBIENT}?${q}`, {
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
       if (!r.ok) {
         throw new Error(`Ambient ${r.status}`);
       }
@@ -123,6 +173,6 @@ export class AmbientService {
         break;
       }
     }
-    return found.slice(0, 10);
+    return found.slice(0, MAX_RESULTS);
   }
 }

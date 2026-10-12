@@ -64,9 +64,15 @@ describe('AlertsStore', () => {
   it('drops responses that arrive after the location changed', async () => {
     const pending = new Map<number, (a: NwsAlert[]) => void>();
     const nws = {
-      alertsAt: async (lat: number) => new Promise<NwsAlert[]>((r) => pending.set(lat, r)),
+      alertsAt: async (lat: number) =>
+        new Promise<NwsAlert[]>((r) => {
+          pending.set(lat, r);
+        }),
       warningShapes: async () => [],
-      latestObservation: async () => new Promise(() => undefined),
+      latestObservation: async () =>
+        new Promise(() => {
+          /* never settles */
+        }),
     };
     TestBed.configureTestingModule({
       providers: [
@@ -79,21 +85,31 @@ describe('AlertsStore', () => {
     const settings = TestBed.inject(SettingsStore);
     const store = TestBed.inject(AlertsStore);
     settings.location.set(place(30));
-    await new Promise((r) => setTimeout(r));
+    await new Promise((r) => {
+      setTimeout(r);
+    });
     TestBed.tick();
-    await new Promise((r) => setTimeout(r));
+    await new Promise((r) => {
+      setTimeout(r);
+    });
     expect(pending.has(30)).toBe(true);
 
     settings.location.set(place(31));
     TestBed.tick();
-    await new Promise((r) => setTimeout(r));
+    await new Promise((r) => {
+      setTimeout(r);
+    });
     expect(pending.has(31)).toBe(true);
 
     // The old location answers last: it must not replace the new location's alerts.
     pending.get(31)!([alert('new', 'Flood Watch')]);
-    await new Promise((r) => setTimeout(r));
+    await new Promise((r) => {
+      setTimeout(r);
+    });
     pending.get(30)!([alert('old', 'Tornado Warning')]);
-    await new Promise((r) => setTimeout(r));
+    await new Promise((r) => {
+      setTimeout(r);
+    });
 
     expect(store.alerts().map((a) => a.id)).toEqual(['new']);
     expect(store.danger()).toEqual([]);
@@ -113,7 +129,10 @@ describe('AlertsStore', () => {
               return [];
             },
             warningShapes: async () => [],
-            latestObservation: async () => new Promise(() => undefined),
+            latestObservation: async () =>
+              new Promise(() => {
+                /* never settles */
+              }),
           },
         },
         { provide: NhcService, useValue: { activeStorms: async () => [] } },
@@ -125,7 +144,9 @@ describe('AlertsStore', () => {
     settings.location.set(place(30));
     for (let i = 0; i < 5; i++) {
       TestBed.tick();
-      await new Promise((r) => setTimeout(r));
+      await new Promise((r) => {
+        setTimeout(r);
+      });
     }
     expect(alertCalls).toBe(1);
   });

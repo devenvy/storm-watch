@@ -554,7 +554,7 @@ packages:
     engines: {node: '>=20.19.0'}
 
   '@devenvy/code-guidelines@file:../.code-guidelines-local/devenvy-code-guidelines-0.0.0.tgz':
-    resolution: {integrity: sha512-Rdlh9A72rnkaQNEIB8dKTpfHu3+ssYKiWZbCx7f+RwZl3dr0SJKpJe2f6a+L6lSkZbc29NAxisxpfPwEsw0GYg==, tarball: file:../.code-guidelines-local/devenvy-code-guidelines-0.0.0.tgz}
+    resolution: {integrity: sha512-XKrj+LTCS9Sd+iTObiTdCUZAtZIsv0chznBdQzWDtXA+G+IxyOgwTjfFNrOPYgHFVnqos6CmboZ1CAgIsDXAHg==, tarball: file:../.code-guidelines-local/devenvy-code-guidelines-0.0.0.tgz}
     version: 0.0.0
     engines: {node: ^22.13.0 || >=24}
     hasBin: true
