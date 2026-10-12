@@ -213,8 +213,8 @@ importers:
         specifier: ^22.2.0
         version: 22.2.2(@angular/compiler@22.2.2)(typescript@6.0.3)
       '@devenvy/code-guidelines':
-        specifier: file:D:/Source/.code-guidelines-local/devenvy-code-guidelines-1.0.0.tgz
-        version: file:../.code-guidelines-local/devenvy-code-guidelines-1.0.0.tgz(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(@typescript-eslint/utils@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(angular-eslint@22.6.0(chokidar@5.0.0)(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript-eslint@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(knip@6.41.0)(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)(vitest@5.0.3)
+        specifier: ^1.0.0
+        version: 1.0.0(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(@typescript-eslint/utils@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(angular-eslint@22.6.0(chokidar@5.0.0)(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript-eslint@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(knip@6.41.0)(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)(vitest@5.0.3)
       '@types/geojson':
         specifier: ^7946.0.16
         version: 7946.0.16
@@ -580,9 +580,8 @@ packages:
     resolution: {integrity: sha512-OoKoR0f76dCY666JlcbhmVTs2drYj1GUXZTYTcbUgJjh9Nv41aFfZ21bPQTERm5+L5cBDo466NltB2lplS5GBw==}
     engines: {node: '>=20.19.0'}
 
-  '@devenvy/code-guidelines@file:../.code-guidelines-local/devenvy-code-guidelines-1.0.0.tgz':
-    resolution: {integrity: sha512-A2xCodQyP23Ho7g6hHOfbEsjv3FmiGzbCx8z1w55BwdT/zIyWSQpGxPj2MxlAi8IdCGwpDb8ZYiN+3dk3icZZA==, tarball: file:../.code-guidelines-local/devenvy-code-guidelines-1.0.0.tgz}
-    version: 1.0.0
+  '@devenvy/code-guidelines@1.0.0':
+    resolution: {integrity: sha512-MsJHUhxDOyWdDRn5WtH6rTIdHQR7zR2llqvzf1VRNZZS2XIEjfZV43FafP5lYQJEItljul7A/lRVraBemAgrAg==}
     engines: {node: ^22.13.0 || >=24}
     hasBin: true
     peerDependencies:
@@ -3744,7 +3743,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.2': {}
 
-  '@devenvy/code-guidelines@file:../.code-guidelines-local/devenvy-code-guidelines-1.0.0.tgz(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(@typescript-eslint/utils@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(angular-eslint@22.6.0(chokidar@5.0.0)(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript-eslint@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(knip@6.41.0)(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)(vitest@5.0.3)':
+  '@devenvy/code-guidelines@1.0.0(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(@typescript-eslint/utils@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(angular-eslint@22.6.0(chokidar@5.0.0)(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript-eslint@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(knip@6.41.0)(prettier@3.9.10)(supports-color@8.1.1)(typescript@6.0.3)(vitest@5.0.3)':
     dependencies:
       '@vitest/eslint-plugin': 1.6.27(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.71.1(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3))(eslint@10.12.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@6.0.3)(vitest@5.0.3)
       eslint: 10.12.0(jiti@2.7.0)(supports-color@8.1.1)
