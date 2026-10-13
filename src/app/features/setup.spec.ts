@@ -99,6 +99,14 @@ describe('Setup', () => {
     [...scope.querySelectorAll<HTMLButtonElement>('button')].find((b) =>
       b.textContent.includes(text),
     )!;
+  // Compression runs on real streams that whenStable does not track: wait for the link itself.
+  const createLink = async () => {
+    button(section('share'), 'Create link').click();
+    await vi.waitFor(() => {
+      expect(section('share').querySelector('textarea')).not.toBeNull();
+    });
+    await stable();
+  };
   const type = (input: HTMLInputElement | HTMLSelectElement, value: string, event = 'input') => {
     input.value = value;
     input.dispatchEvent(new Event(event));
@@ -423,8 +431,7 @@ describe('Setup', () => {
         const board = section('share').querySelector('select')!;
         type(board, 'radar', 'change');
         await stable();
-        button(section('share'), 'Create link').click();
-        await stable();
+        await createLink();
         const link = section('share').querySelector('textarea')!.value;
         expect(link).toMatch(/#\/d\/radar\?cfg=[zj][\w-]+&kiosk=1$/);
         expect(section('share').querySelector('.warn')).toBeNull();
@@ -437,8 +444,7 @@ describe('Setup', () => {
         section('share').querySelectorAll<HTMLInputElement>('input[type=checkbox]')[0]!.click();
         await stable();
         expect(section('share').querySelector('textarea')).toBeNull();
-        button(section('share'), 'Create link').click();
-        await stable();
+        await createLink();
         expect(section('share').querySelector('textarea')!.value).not.toContain('kiosk');
       } finally {
         Reflect.deleteProperty(navigator, 'clipboard');
@@ -455,8 +461,7 @@ describe('Setup', () => {
       expect(section('share').querySelector('.warn')?.textContent).toContain(
         'will contain your IPTV username',
       );
-      button(section('share'), 'Create link').click();
-      await stable();
+      await createLink();
       expect(section('share').querySelector('.warn')?.textContent).toContain(
         'This link contains your IPTV username',
       );
