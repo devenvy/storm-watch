@@ -13,12 +13,6 @@ multi-ecosystem-groups:
       interval: weekly
       day: monday
     labels: [dependencies]
-    # conventional titles for release-please: dependency updates ship as a patch release
-    # (with multi-ecosystem groups, commit-message is only allowed on the group)
-    commit-message:
-      prefix: fix
-      prefix-development: chore
-      include: scope
 
 updates:
   - package-ecosystem: npm

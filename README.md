@@ -145,11 +145,11 @@ Your provider's connection limit applies: each playing TV widget uses one connec
 Requires Node.js 24.
 
 ```bash
-npm ci
-npm start            # dev server on http://127.0.0.1:4317
-npm run lint
-npm run test:ci      # unit tests (Vitest)
-npm run build        # production build in dist/stormwatch/browser
+pnpm install
+pnpm start           # dev server on http://127.0.0.1:4317
+pnpm run lint
+pnpm run test:ci     # unit tests (Vitest)
+pnpm run build       # production build in dist/stormwatch/browser
 ```
 
 Built with Angular 22 (standalone components, signals, zoneless, OnPush), Leaflet, hls.js, mpegts.js and the
@@ -158,19 +158,17 @@ swapped (e.g. for a server-backed store) without touching features.
 
 ### CI / releases
 
-- **Checks**, each its own workflow so it passes or fails on its own, on every pull request:
-  `lint.yml`, `test.yml`, `build.yml` (production build and size budgets), `audit.yml` (`npm audit` of
-  runtime dependencies, also weekly) and `docker.yml` (image build plus a smoke test of the container and its
-  security headers).
-- **CodeQL** (`codeql.yml`): security analysis of the TypeScript and the workflows on pull requests, `main`
-  and weekly.
-- **Dependabot**: one grouped pull request a week for npm, GitHub Actions and Docker updates (major
-  versions are upgraded by hand).
-- **Pages** (`pages.yml`): every push to `main` runs the checks and, when they pass, deploys to GitHub Pages (Settings → Pages → Source: GitHub
-  Actions).
-- **Release** (`release.yml`): pushing a tag `vX.Y.Z` (or `vX.Y.Z-beta.N` for a pre-release) runs the checks, attaches
-  a zip of the static build to a GitHub release, and publishes a multi-arch image to
-  `ghcr.io/devenvy/storm-watch`.
+- **CI** (`ci.yml`), on every pull request and weekly: lint (including `code-guidelines check`,
+  knip, actionlint and zizmor), unit tests with coverage, the production build, a runtime dependency
+  audit, dependency review, and a container build with a smoke test of its security headers. `result`
+  is the single required check. CodeQL and Code Quality also run on pull requests.
+- **Dependabot**: one grouped pull request a week for npm, GitHub Actions and Docker updates; it
+  merges itself once CI passes.
+- **Every push to `main`** (`release.yml`): CI, then the site deploys to GitHub Pages and the image
+  is pushed to `ghcr.io/devenvy/storm-watch` as `latest` and `sha-<commit>`.
+- **Releases** are cut by hand: `gh release create vX.Y.Z --target main --generate-notes` (or the
+  Releases page). Publishing one runs CI, pushes the image as `X.Y.Z` and `X.Y`, and attaches a zip of
+  the static build and an SBOM to the release.
 
 ## License
 

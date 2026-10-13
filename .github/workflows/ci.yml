@@ -1,11 +1,9 @@
 name: CI
 
-# Pull requests, the weekly audit, and the gate for pages.yml.
-# Required status check: "result" (via pages.yml it reports as "ci / result").
+# Pull requests, the weekly audit, and the gate for release.yml.
+# Required status check: "result" (via release.yml it reports as "ci / result").
 on:
   pull_request:
-    # edited: re-check after a PR title is fixed (titles become release-please commit messages)
-    types: [opened, synchronize, reopened, edited]
   schedule:
     - cron: '17 6 * * 1'
   workflow_call:
@@ -19,19 +17,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Squash merges use the PR title as the commit message, and release-please reads those, so
-  # titles must be conventional commits (feat:, fix:, feat!:, chore:, ...).
-  pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      pull-requests: read
-    steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -169,7 +154,7 @@ jobs:
         run: docker logs sw
 
   # Dependabot PRs merge themselves once the required check passes. Runs as the devenvy-bot app
-  # so the merge triggers pages.yml and release.yml (a GITHUB_TOKEN merge would not).
+  # so the merge triggers release.yml (a GITHUB_TOKEN merge would not).
   # Needs the org Dependabot secrets DEVENVY_BOT_CLIENT_ID and DEVENVY_BOT_PRIVATE_KEY.
   dependabot-auto-merge:
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login == 'dependabot[bot]'
@@ -194,14 +179,13 @@ jobs:
   # Single required status check.
   result:
     if: always()
-    needs: [pr-title, lint, test, build, audit, dependency-review, docker]
+    needs: [lint, test, build, audit, dependency-review, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
       - name: All jobs passed
         env:
-          PR_TITLE: ${{ needs.pr-title.result }}
           DEPENDENCY_REVIEW: ${{ needs.dependency-review.result }}
           LINT: ${{ needs.lint.result }}
           TEST: ${{ needs.test.result }}
@@ -209,11 +193,10 @@ jobs:
           AUDIT: ${{ needs.audit.result }}
           DOCKER: ${{ needs.docker.result }}
           IS_PR: ${{ github.event_name == 'pull_request' }}
-        # pr-title and dependency-review only run on pull requests; the audit is informational there
+        # dependency-review only runs on pull requests; the audit is informational there
         run: |
           for result in "$LINT" "$TEST" "$BUILD" "$DOCKER"; do test "$result" = "success"; done
           if [ "$IS_PR" = "true" ]; then
-            test "$PR_TITLE" = "success"
             test "$DEPENDENCY_REVIEW" = "success"
           else
             test "$AUDIT" = "success"
