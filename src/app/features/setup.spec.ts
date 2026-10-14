@@ -475,8 +475,7 @@ describe('Setup', () => {
       await stable();
       expect(section('share').querySelector('.err')?.textContent).toBe('too big');
 
-      button(section('share'), 'Create link').click();
-      await stable();
+      await createLink();
       // No clipboard in jsdom: copying fails.
       button(section('share'), 'Copy').click();
       await stable();
