@@ -1,0 +1,194 @@
+@if (location(); as loc) {
+  @if (!kiosk()) {
+    <nav class="bar" aria-label="Dashboards">
+      @for (b of store.boards(); track b.id) {
+        <a
+          class="tab"
+          [routerLink]="['/d', b.id]"
+          [class.on]="b.id === current().id"
+          [attr.aria-current]="b.id === current().id ? 'page' : null"
+          >{{ b.name }}</a
+        >
+      }
+      <span class="spacer"></span>
+      @if (editing()) {
+        <button type="button" (click)="newBoard()">＋ New</button>
+        <button type="button" (click)="duplicate()">Duplicate</button>
+        <a class="btn" routerLink="/setup" fragment="share">Share / TV link</a>
+      }
+      <button
+        type="button"
+        class="edit-toggle"
+        [class.on]="editing()"
+        (click)="editing.set(!editing())"
+      >
+        {{ editing() ? '✓ Done' : '✎ Edit' }}
+      </button>
+    </nav>
+
+    @if (editing()) {
+      <div class="editbar">
+        <label
+          >Name <input maxlength="40" [value]="current().name" (change)="rename($event)"
+        /></label>
+        <label
+          >Rows on screen
+          <select (change)="setRows($event)">
+            @for (n of rowChoices; track n) {
+              <option [value]="n" [selected]="n === current().rows">{{ n }}</option>
+            }
+          </select>
+        </label>
+        <label
+          >Add
+          <select #addSel aria-label="Widget type">
+            @for (t of widgetTypes; track t.type) {
+              <option [value]="t.type">{{ t.label }}</option>
+            }
+          </select>
+        </label>
+        <button type="button" (click)="add(addSel.value)">＋ Add widget</button>
+        <span class="spacer"></span>
+        <button
+          type="button"
+          title="Move tab left"
+          aria-label="Move tab left"
+          (click)="store.moveBoard(current().id, -1)"
+        >
+          ◀
+        </button>
+        <button
+          type="button"
+          title="Move tab right"
+          aria-label="Move tab right"
+          (click)="store.moveBoard(current().id, 1)"
+        >
+          ▶
+        </button>
+        <button
+          type="button"
+          class="danger"
+          [disabled]="store.boards().length < 2"
+          (click)="removeBoard()"
+        >
+          Delete board
+        </button>
+        <button type="button" class="danger" (click)="resetAll()">Reset all</button>
+      </div>
+    }
+  }
+
+  <div class="viewport">
+    <div
+      class="grid"
+      cdkDropList
+      cdkDropListOrientation="mixed"
+      [style.--rows]="current().rows"
+      [class.editing]="editable()"
+      [cdkDropListDisabled]="!editable()"
+      (cdkDropListDropped)="drop($event)"
+    >
+      @for (w of current().widgets; track w.id) {
+        <div class="cell" cdkDrag [style.--w]="w.w" [style.--h]="w.h" [style.--mh]="mobileRows(w)">
+          @switch (w.type) {
+            @case ('radar') {
+              <sw-radar-widget
+                [location]="loc"
+                [source]="w.source ?? 'blend'"
+                (sourceChange)="setSource(w, $event)"
+              />
+            }
+            @case ('player') {
+              <sw-player-widget [ch]="ch()" [pinned]="w.channel" />
+            }
+            @case ('channels') {
+              <sw-channels-widget [ch]="ch()" />
+            }
+            @case ('alerts') {
+              <sw-alerts-widget />
+            }
+            @case ('conditions') {
+              <sw-conditions-widget />
+            }
+            @case ('tropical') {
+              <sw-tropical-widget />
+            }
+            @case ('links') {
+              <sw-links-widget [location]="loc" />
+            }
+            @default never;
+          }
+          @if (editable()) {
+            <div class="overlay">
+              <span class="handle" cdkDragHandle title="Drag to move">⠿ {{ label(w.type) }}</span>
+              <span class="size">
+                <span class="grp"
+                  >W
+                  <button
+                    type="button"
+                    aria-label="Narrower"
+                    (click)="store.resize(current().id, w.id, -1, 0)"
+                  >
+                    −
+                  </button>
+                  {{ w.w }}
+                  <button
+                    type="button"
+                    aria-label="Wider"
+                    (click)="store.resize(current().id, w.id, 1, 0)"
+                  >
+                    +
+                  </button></span
+                >
+                <span class="grp"
+                  >H
+                  <button
+                    type="button"
+                    aria-label="Shorter"
+                    (click)="store.resize(current().id, w.id, 0, -1)"
+                  >
+                    −
+                  </button>
+                  {{ w.h }}
+                  <button
+                    type="button"
+                    aria-label="Taller"
+                    (click)="store.resize(current().id, w.id, 0, 1)"
+                  >
+                    +
+                  </button></span
+                >
+              </span>
+              @if (w.type === 'player') {
+                <select aria-label="Pinned channel" (change)="pin(w, $event)">
+                  <option value="" [selected]="!w.channel">Follows channel picker</option>
+                  @for (c of lineup.channels(); track c.key) {
+                    <option [value]="c.key" [selected]="c.key === w.channel">
+                      {{ c.name }}
+                    </option>
+                  }
+                </select>
+              }
+              <button
+                type="button"
+                class="danger"
+                aria-label="Remove widget"
+                (click)="store.removeWidget(current().id, w.id)"
+              >
+                ✕
+              </button>
+            </div>
+          }
+        </div>
+      } @empty {
+        <p class="muted empty-board">This dashboard is empty. Use ✎ Edit → Add widget.</p>
+      }
+    </div>
+  </div>
+} @else {
+  <section class="panel welcome">
+    <h2>Welcome to Storm Watch</h2>
+    <p>Set your location to start monitoring alerts and radar.</p>
+    <a class="btn" routerLink="/setup">Set up</a>
+  </section>
+}

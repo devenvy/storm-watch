@@ -2,10 +2,8 @@
   "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
   "version": 1,
   "cli": {
-    "packageManager": "npm",
-    "schematicCollections": [
-      "angular-eslint"
-    ]
+    "packageManager": "pnpm",
+    "schematicCollections": ["angular-eslint"]
   },
   "newProjectRoot": "projects",
   "projects": {
@@ -32,14 +30,8 @@
                 "input": "public"
               }
             ],
-            "styles": [
-              "node_modules/leaflet/dist/leaflet.css",
-              "src/styles.scss"
-            ],
-            "allowedCommonJsDependencies": [
-              "mpegts.js",
-              "leaflet"
-            ]
+            "styles": ["node_modules/leaflet/dist/leaflet.css", "src/styles.scss"],
+            "allowedCommonJsDependencies": ["mpegts.js", "leaflet"]
           },
           "configurations": {
             "production": {
@@ -94,15 +86,15 @@
           }
         },
         "test": {
-          "builder": "@angular/build:unit-test"
-        },
-        "lint": {
-          "builder": "@angular-eslint/builder:lint",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "lintFilePatterns": [
-              "src/**/*.ts",
-              "src/**/*.html"
-            ]
+            "coverageReporters": ["text-summary", "json-summary", "json", "html"],
+            "coverageThresholds": {
+              "statements": 85,
+              "branches": 85,
+              "functions": 85,
+              "lines": 85
+            }
           }
         }
       }

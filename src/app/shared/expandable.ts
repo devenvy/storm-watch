@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, Directive, ElementRef, inject, input, signal } from '@angular/core';
+import { Directive, ElementRef, inject, signal } from '@angular/core';
+
+export { CardButtons } from './card-buttons';
+
+/** Fullscreen was denied or already exited; the card stays enlarged either way. */
+function ignoreFullscreenError(): void {
+  // Nothing to recover: the overlay state does not depend on true fullscreen.
+}
 
 /**
  * Lets a card pop out to a large overlay (and optionally true fullscreen). The card is
@@ -6,41 +13,27 @@ import { ChangeDetectionStrategy, Component, Directive, ElementRef, inject, inpu
  */
 @Directive({
   selector: '[swExpandable]',
-  exportAs: 'card',
   host: {
     '[class.card-expanded]': 'expanded()',
     '(document:keydown.escape)': 'expanded.set(false)',
   },
+  exportAs: 'card',
 })
 export class Expandable {
-  readonly expanded = signal(false);
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
+  readonly expanded = signal(false);
 
   toggle(): void {
-    this.expanded.update(v => !v);
+    this.expanded.update((v) => !v);
   }
 
   fullscreen(): void {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else this.el.nativeElement.requestFullscreen?.();
-  }
-}
-
-@Component({
-  selector: 'sw-card-buttons',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    @if (card().expanded()) {
-      <button (click)="card().fullscreen()" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(ignoreFullscreenError);
+    } else {
+      // Not every browser can fullscreen arbitrary elements (e.g. iPhone Safari).
+      const el: Partial<Pick<HTMLElement, 'requestFullscreen'>> = this.el.nativeElement;
+      el.requestFullscreen?.().catch(ignoreFullscreenError);
     }
-    <button (click)="card().toggle()" [title]="card().expanded() ? 'Close (Esc)' : 'Expand'"
-      [attr.aria-label]="card().expanded() ? 'Close' : 'Expand'">{{ card().expanded() ? '✕' : '⤢' }}</button>
-  `,
-  styles: `
-    :host { display: inline-flex; gap: 4px; text-transform: none; letter-spacing: 0; }
-    button { padding: 1px 7px; font-size: 13px; line-height: 1.4; }
-  `,
-})
-export class CardButtons {
-  readonly card = input.required<Expandable>();
+  }
 }

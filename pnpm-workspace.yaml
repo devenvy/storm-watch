@@ -1,0 +1,9 @@
+allowBuilds:
+  esbuild: true
+  '@parcel/watcher': false
+  lmdb: false
+  msgpackr-extract: false
+  unrs-resolver: false
+# Our own packages skip the release-age wait, as they skip Dependabot's cooldown.
+minimumReleaseAgeExclude:
+  - '@devenvy/*'

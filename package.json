@@ -7,11 +7,16 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "test:ci": "ng test --watch=false",
-    "lint": "ng lint"
+    "test:ci": "ng test --watch=false --coverage",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "ngc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
+    "guidelines:check": "code-guidelines check",
+    "knip": "knip"
   },
   "private": true,
-  "packageManager": "npm@11.17.0",
+  "packageManager": "pnpm@12.11.2",
   "dependencies": {
     "@angular/cdk": "^22.2.2",
     "@angular/common": "^22.2.0",
@@ -30,17 +35,27 @@
     "@angular/build": "^22.2.2",
     "@angular/cli": "^22.2.2",
     "@angular/compiler-cli": "^22.2.0",
-    "@eslint/js": "^10.0.1",
+    "@devenvy/code-guidelines": "^3.0.0",
     "@types/geojson": "^7946.0.16",
     "@types/leaflet": "^1.9.22",
-    "angular-eslint": "22.5.0",
-    "eslint": "^10.9.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "@vitest/eslint-plugin": "^1.6.27",
+    "angular-eslint": "^22.6.0",
+    "eslint": "^10.12.0",
     "jsdom": "^30.0.0",
-    "prettier": "^3.8.1",
-    "typescript": "~6.0.2",
-    "typescript-eslint": "8.71.1",
+    "knip": "^6.41.0",
+    "prettier": "^3.9.10",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
     "vitest": "^5.0.0"
   },
   "description": "Client-side severe weather monitor: NWS alerts, radar with forecast, conditions, tropical storms and your own live TV.",
-  "license": "MIT"
+  "license": "MIT",
+  "prettier": "@devenvy/code-guidelines/prettier/angular",
+  "codeGuidelines": {
+    "env": "browser",
+    "typescript": true,
+    "angular": true,
+    "vitest": true
+  }
 }

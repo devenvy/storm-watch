@@ -7,21 +7,25 @@ export class LocalStorageBackend implements StorageBackend {
   async get<T>(key: string): Promise<T | undefined> {
     try {
       const raw = localStorage.getItem(key);
-      return raw == null ? undefined : (JSON.parse(raw) as T);
+      return raw === null ? undefined : (JSON.parse(raw) as T);
     } catch {
       return undefined;
     }
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
+  async set(key: string, value: unknown): Promise<void> {
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch { /* storage unavailable: state stays in memory */ }
+    } catch {
+      /* storage unavailable: state stays in memory */
+    }
   }
 
   async remove(key: string): Promise<void> {
     try {
       localStorage.removeItem(key);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 }

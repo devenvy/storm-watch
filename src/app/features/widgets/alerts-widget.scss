@@ -1,0 +1,48 @@
+.alert {
+  border-left: 4px solid var(--yellow);
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 5px 8px;
+  margin-bottom: 6px;
+}
+.alert.Extreme {
+  border-color: var(--red);
+}
+.alert.Severe {
+  border-color: var(--orange);
+}
+.alert summary {
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.alert summary b {
+  flex: 1;
+  min-width: 0;
+}
+.alert small {
+  color: var(--muted);
+}
+.alert pre {
+  white-space: pre-wrap;
+  font:
+    12px/1.45 ui-monospace,
+    Consolas,
+    monospace;
+  margin: 6px 0 0;
+}
+.alert .instr {
+  color: var(--yellow);
+}
+.err {
+  color: var(--red);
+  margin: 0 0 6px;
+}
+:host(.card-expanded) pre {
+  font-size: 14px;
+}
+:host(.card-expanded) .alert summary b {
+  font-size: 16px;
+}

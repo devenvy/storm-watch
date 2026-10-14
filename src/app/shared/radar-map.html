@@ -1,0 +1,89 @@
+<div class="mapwrap">
+  <div #map class="map" tabindex="0" aria-label="Radar map"></div>
+  @if (frame()?.kind === 'forecast') {
+    <span class="badge">FORECAST · model</span>
+  }
+  @if (loading()) {
+    <span class="badge loading">Loading…</span>
+  }
+  @if (error()) {
+    <span class="badge err">{{ error() }}</span>
+  }
+</div>
+<div class="timeline">
+  <div class="controls">
+    <button type="button" title="First" aria-label="First frame" (click)="go(0)">⏮</button>
+    <button type="button" title="Back (←)" aria-label="Previous frame" (click)="step(-1)">◀</button>
+    <button
+      type="button"
+      class="play"
+      [attr.aria-label]="playing() ? 'Pause' : 'Play'"
+      (click)="playing.set(!playing())"
+    >
+      {{ playing() ? '⏸' : '▶' }}
+    </button>
+    <button type="button" title="Forward (→)" aria-label="Next frame" (click)="step(1)">▶</button>
+    <button
+      type="button"
+      title="Latest observed"
+      aria-label="Latest observed frame"
+      (click)="go(set().startIndex)"
+    >
+      ●
+    </button>
+    <button type="button" title="Last" aria-label="Last frame" (click)="go(last())">⏭</button>
+    @if (frame(); as f) {
+      <span class="time" [class.future]="f.kind === 'forecast'">
+        <b>{{ f.time | date: 'h:mm a' }}</b
+        ><small>{{ rel(f.time) }}</small>
+      </span>
+    }
+    <select
+      #speedSel
+      aria-label="Playback speed"
+      [value]="speed()"
+      (change)="setSpeed(speedSel.value)"
+    >
+      <option value="slow">Slow</option>
+      <option value="normal">Normal</option>
+      <option value="fast">Fast</option>
+    </select>
+  </div>
+  <div class="track">
+    @if (nowPct() !== null) {
+      <span class="nowline" title="Now" [style.left.%]="nowPct()"></span>
+    }
+    <input
+      #slider
+      type="range"
+      min="0"
+      step="1"
+      aria-label="Radar time"
+      [max]="last()"
+      [value]="index()"
+      (input)="go(+slider.value)"
+    />
+  </div>
+  <div class="ticks">
+    @for (t of ticks(); track t.i) {
+      <button
+        type="button"
+        class="tick"
+        [style.left.%]="pct(t.i)"
+        [class.on]="t.i === index()"
+        [class.future]="t.f.kind === 'forecast'"
+        (click)="go(t.i)"
+      >
+        {{ t.f.time | date: 'h:mm' }}
+      </button>
+    }
+  </div>
+  <div class="legend">
+    <i class="tor"></i>Tornado <i class="svr"></i>Svr T-storm <i class="ffw"></i>Flash flood
+    <i class="ewx"></i>Ext. wind
+    @if (set().note) {
+      <span class="note">{{ set().note }}</span>
+    }
+    <button type="button" class="link" (click)="recenter()">Recenter</button>
+  </div>
+</div>

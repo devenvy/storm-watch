@@ -1,0 +1,9 @@
+# >>> @devenvy/code-guidelines >>>
+package-lock.json
+pnpm-lock.yaml
+CHANGELOG.md
+dist/
+coverage/
+.angular/
+out-tsc/
+# <<< @devenvy/code-guidelines <<<

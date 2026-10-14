@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+
 import { FETCH_TIMEOUT_MS } from './nws.service';
 
 /**
@@ -6,10 +7,16 @@ import { FETCH_TIMEOUT_MS } from './nws.service';
  * ArcGIS service instead, which does. Each basin has five storm "bins" (AT1-AT5, EP1-EP5,
  * CP1-CP5), each with its own forecast-points layer; the tau=0 point is the current position.
  */
-const MAPSERVER = 'https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather/MapServer';
+const MAPSERVER =
+  'https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather/MapServer';
+/** Each basin has this many storm bins, numbered from 1. */
+const BINS_PER_BASIN = 5;
+const BINS = ['AT', 'EP', 'CP'].flatMap((b) =>
+  Array.from({ length: BINS_PER_BASIN }, (_, n) => `${b}${n + 1}`),
+);
 /** Layer id of "<bin> Forecast Points": bins are laid out 26 layer ids apart, starting at 6. */
-const BINS = ['AT', 'EP', 'CP'].flatMap(b => [1, 2, 3, 4, 5].map(n => `${b}${n}`));
-const pointsLayer = (i: number) => 6 + i * 26;
+const POINTS_LAYER = { first: 6, stride: 26 };
+const pointsLayer = (i: number) => POINTS_LAYER.first + i * POINTS_LAYER.stride;
 
 export interface Storm {
   id: string;
@@ -27,33 +34,67 @@ export interface Storm {
 }
 
 const KT_TO_MPH = 1.15078;
+/** ArcGIS sentinel for a missing numeric value. */
+const MISSING = 9999;
+/** Storm ids look like AL092024: a 2-letter basin, then a 2-digit storm number. */
+const STORM_ID = { basinEnd: 2, numberEnd: 4 };
+
+/** The slice of an ArcGIS forecast-points query response this file reads. */
+interface ForecastPointAttributes {
+  // Typed loosely: the id is coerced with String() before parsing.
+  idp_source?: string | number | null;
+  stormname: string;
+  tcdvlp: string;
+  maxwind: number;
+  mslp: number;
+  lat: number;
+  lon: number;
+  tcdir: number;
+  tcspd: number;
+  advisnum: string;
+  advdate: string;
+}
+interface ForecastPointsResponse {
+  error?: { message: string };
+  features?: { attributes?: ForecastPointAttributes | null }[];
+}
 
 /**
  * NHC's cone graphic lives under a folder per storm (AL09 -> AT09). The file name after
  * the "+png/" folder is ignored by NHC and only busts caches, so use the advisory number.
  */
 function coneUrl(id: string, advisory: string): string {
-  const dir = id.slice(0, 2).replace('AL', 'AT') + id.slice(2, 4);
+  const dir =
+    id.slice(0, STORM_ID.basinEnd).replace('AL', 'AT') +
+    id.slice(STORM_ID.basinEnd, STORM_ID.numberEnd);
   return `https://www.nhc.noaa.gov/storm_graphics/${dir}/refresh/${id}_5day_cone+png/${encodeURIComponent(advisory)}_5day_cone.png`;
 }
-const known = (n: number) => (n === 9999 ? null : n);
+const known = (n: number) => (n === MISSING ? null : n);
 
 @Injectable({ providedIn: 'root' })
 export class NhcService {
   async activeStorms(): Promise<Storm[]> {
-    const results = await Promise.all(BINS.map((bin, i) => this.current(bin, pointsLayer(i))));
-    return results.filter((s): s is Storm => !!s);
+    const results = await Promise.all(
+      BINS.map(async (bin, i) => this.current(bin, pointsLayer(i))),
+    );
+    return results.filter((s): s is Storm => Boolean(s));
   }
 
   private async current(bin: string, layer: number): Promise<Storm | null> {
     const q = `${MAPSERVER}/${layer}/query?where=tau%3D0&outFields=*&returnGeometry=false&f=json`;
     const r = await fetch(q, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!r.ok) throw new Error(`NHC ${r.status}`);
-    const d = await r.json();
-    if (d.error) throw new Error(`NHC: ${d.error.message}`);
+    if (!r.ok) {
+      throw new Error(`NHC ${r.status}`);
+    }
+    const d = (await r.json()) as ForecastPointsResponse;
+    if (d.error) {
+      throw new Error(`NHC: ${d.error.message}`);
+    }
     const a = d.features?.[0]?.attributes;
-    if (!a) return null;
-    const id = String(a.idp_source ?? '').split('-')[0].toUpperCase();
+    if (!a) {
+      return null;
+    }
+    const id = (String(a.idp_source ?? '').split('-')[0] ?? '').toUpperCase();
     const speedKt = known(a.tcspd);
     return {
       id,

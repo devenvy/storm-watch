@@ -1,16 +1,20 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
 import { AlertsStore } from './core/alerts.store';
 import { SettingsStore } from './core/settings.store';
 import { ShareService } from './core/share';
 
+const CLOCK_TICK_MS = 1000;
+const NOTICE_DURATION_MS = 6000;
+
 @Component({
   selector: 'sw-root',
-  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.kiosk]': 'kiosk()' },
 })
 export class App {
@@ -27,19 +31,25 @@ export class App {
   protected readonly onBoard = signal(true);
 
   constructor() {
-    const tick = setInterval(() => this.clock.set(new Date()), 1000);
+    const tick = setInterval(() => this.clock.set(new Date()), CLOCK_TICK_MS);
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
 
-    this.router.events.pipe(takeUntilDestroyed()).subscribe(e => {
-      if (!(e instanceof NavigationEnd)) return;
+    this.router.events.pipe(takeUntilDestroyed()).subscribe((e) => {
+      if (!(e instanceof NavigationEnd)) {
+        return;
+      }
       const tree = this.router.parseUrl(this.router.url);
-      const path = this.router.url.split(/[?#]/)[0];
+      const path = this.router.url.split(/[?#]/)[0] ?? '';
       this.onBoard.set(path === '/' || path.startsWith('/d/'));
       const params = tree.queryParamMap;
       const k = params.get('kiosk');
       this.kiosk.set(k !== null && k !== '0' && k !== 'false');
       const cfg = params.get('cfg');
-      if (cfg) void this.applyShare(cfg);
+      if (cfg) {
+        this.applyShare(cfg).catch((err: unknown) => {
+          console.error('Could not apply share link', err);
+        });
+      }
     });
   }
 
@@ -47,11 +57,17 @@ export class App {
   private async applyShare(cfg: string): Promise<void> {
     try {
       const applied = await this.share.apply(cfg);
-      if (applied) this.notice.set('Shared setup applied.');
+      if (applied) {
+        this.notice.set('Shared setup applied.');
+      }
     } catch (e) {
       this.notice.set(`Could not apply share link: ${(e as Error).message}`);
     }
-    await this.router.navigate([], { queryParams: { cfg: null }, queryParamsHandling: 'merge', replaceUrl: true });
-    setTimeout(() => this.notice.set(null), 6000);
+    await this.router.navigate([], {
+      queryParams: { cfg: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+    setTimeout(() => this.notice.set(null), NOTICE_DURATION_MS);
   }
 }

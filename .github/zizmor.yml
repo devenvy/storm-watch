@@ -1,0 +1,4 @@
+rules:
+  # `uses: ./.github/workflows/ci.yml` is the form actionlint and GitHub's docs use
+  self-repository:
+    disable: true
