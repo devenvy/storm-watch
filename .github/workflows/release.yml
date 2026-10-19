@@ -22,10 +22,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Every publishing job needs this one (through ci), so a refusal here publishes nothing.
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # workflow_dispatch can be started from any branch, and the jobs below would deploy
+      # whatever it checked out.
+      - name: A manual run must be on main
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != refs/heads/main ]; then
+            echo "::error::Refusing to publish $REF: run this workflow from main"
+            exit 1
+          fi
       - name: A release tag must be a version on main
         if: github.event_name == 'release'
         env:
